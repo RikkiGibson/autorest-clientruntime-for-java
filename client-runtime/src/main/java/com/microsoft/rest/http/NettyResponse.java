@@ -12,7 +12,6 @@ import io.netty.util.ReferenceCountUtil;
 import rx.Observable;
 import rx.Single;
 import rx.functions.Func1;
-import rx.subjects.PublishSubject;
 
 import java.io.InputStream;
 import java.nio.ByteBuffer;

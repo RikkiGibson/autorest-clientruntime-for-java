@@ -27,15 +27,11 @@ import io.netty.handler.codec.http.HttpResponseDecoder;
 import io.netty.handler.codec.http.HttpVersion;
 import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.GenericFutureListener;
-import rx.Emitter;
-import rx.Emitter.BackpressureMode;
-import rx.Observable;
 import rx.Single;
 import rx.SingleEmitter;
 import rx.functions.Action0;
 import rx.functions.Action1;
 import rx.subjects.PublishSubject;
-import rx.subjects.ReplaySubject;
 import rx.subjects.Subject;
 
 import java.net.URI;

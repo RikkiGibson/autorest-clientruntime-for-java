@@ -31,6 +31,14 @@ public class HttpRequest {
         this.body = null;
     }
 
+    /**
+     * Create a new HttpRequest object, providing everything.
+     * @param callerMethod The fully qualified method that was called to invoke this HTTP request.
+     * @param httpMethod The HTTP method to use with this request.
+     * @param url The URL where this HTTP request should be sent to.
+     * @param headers The headers.
+     * @param body The body.
+     */
     public HttpRequest(String callerMethod, String httpMethod, String url, HttpHeaders headers, HttpRequestBody body) {
         this.callerMethod = callerMethod;
         this.httpMethod = httpMethod;
