@@ -35,6 +35,7 @@ import java.lang.reflect.Method;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Proxy;
 import java.lang.reflect.Type;
+import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -385,11 +386,11 @@ public class RestProxy implements InvocationHandler {
         return asyncResult;
     }
 
-    private boolean isObservableByteArray(TypeToken entityTypeToken) {
-        if (entityTypeToken.isSubtypeOf(Observable.class)) {
-            final Type innerType = ((ParameterizedType) entityTypeToken.getType()).getActualTypeArguments()[0];
+    private boolean isObservableOf(TypeToken observableTypeToken, Type expectedInnerType) {
+        if (observableTypeToken.isSubtypeOf(Observable.class)) {
+            final Type innerType = ((ParameterizedType) observableTypeToken.getType()).getActualTypeArguments()[0];
             final TypeToken innerTypeToken = TypeToken.of(innerType);
-            if (innerTypeToken.isSubtypeOf(byte[].class)) {
+            if (innerTypeToken.isSubtypeOf(expectedInnerType)) {
                 return true;
             }
         }
@@ -422,7 +423,9 @@ public class RestProxy implements InvocationHandler {
                 });
             }
             asyncResult = responseBodyBytesAsync;
-        } else if (isObservableByteArray(entityTypeToken)) {
+        } else if (isObservableOf(entityTypeToken, ByteBuffer.class)) {
+            asyncResult = Single.just(response.streamBodyNioAsync());
+        } else if (isObservableOf(entityTypeToken, byte[].class)) {
             asyncResult = Single.just(response.streamBodyAsync());
         } else {
             asyncResult = response

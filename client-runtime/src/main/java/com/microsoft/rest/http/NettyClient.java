@@ -34,7 +34,9 @@ import rx.Single;
 import rx.SingleEmitter;
 import rx.functions.Action0;
 import rx.functions.Action1;
+import rx.subjects.PublishSubject;
 import rx.subjects.ReplaySubject;
+import rx.subjects.Subject;
 
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -168,7 +170,7 @@ public final class NettyClient extends HttpClient {
                             for (HttpHeader header : request.headers()) {
                                 raw.headers().add(header.name(), header.value());
                             }
-                            raw.headers().set(HEADER_CONTENT_LENGTH, raw.content().readableBytes());
+
                             channel.writeAndFlush(raw).addListener(new GenericFutureListener<Future<? super Void>>() {
                                 @Override
                                 public void operationComplete(Future<? super Void> v) throws Exception {
@@ -193,7 +195,7 @@ public final class NettyClient extends HttpClient {
 
     private static final class HttpClientInboundHandler extends ChannelInboundHandlerAdapter {
 
-        private ReplaySubject<ByteBuf> contentEmitter;
+        private Subject<ByteBuf, ByteBuf> contentEmitter;
         private SingleEmitter<HttpResponse> responseEmitter;
         private NettyAdapter adapter;
         private long contentLength;
@@ -223,7 +225,7 @@ public final class NettyClient extends HttpClient {
                     contentLength = Long.parseLong(response.headers().get(HEADER_CONTENT_LENGTH));
                 }
 
-                contentEmitter = ReplaySubject.create();
+                contentEmitter = PublishSubject.create();
                 responseEmitter.onSuccess(new NettyResponse(response, contentEmitter));
             }
             if (msg instanceof HttpContent) {

@@ -8,8 +8,10 @@ package com.microsoft.rest.http;
 
 import rx.Observable;
 import rx.Single;
+import rx.functions.Func1;
 
 import java.io.InputStream;
+import java.nio.ByteBuffer;
 
 /**
  * This class contains all of the details necessary for reacting to a HTTP response from a
@@ -57,6 +59,19 @@ public abstract class HttpResponse {
      * @return This response's body as an asynchronous sequence of byte[].
      */
     public abstract Observable<byte[]> streamBodyAsync();
+
+    /**
+     * Stream this response's body content into java.nio.ByteBuffer.
+     * @return This response's body as an asynchronous sequence of java.nio.ByteBuffer.
+     */
+    public Observable<ByteBuffer> streamBodyNioAsync() {
+        return streamBodyAsync().map(new Func1<byte[], ByteBuffer>() {
+            @Override
+            public ByteBuffer call(byte[] bytes) {
+                return ByteBuffer.wrap(bytes);
+            }
+        });
+    }
 
     /**
      * Get this response object's body as a string. If this response object doesn't have a body,

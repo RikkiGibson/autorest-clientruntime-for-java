@@ -13,7 +13,7 @@ public class HttpRequest {
     private final String callerMethod;
     private final String httpMethod;
     private final String url;
-    private final HttpHeaders headers = new HttpHeaders();
+    private final HttpHeaders headers;
     private HttpRequestBody body;
 
     /**
@@ -27,6 +27,16 @@ public class HttpRequest {
         this.callerMethod = callerMethod;
         this.httpMethod = httpMethod;
         this.url = url;
+        this.headers = new HttpHeaders();
+        this.body = null;
+    }
+
+    public HttpRequest(String callerMethod, String httpMethod, String url, HttpHeaders headers, HttpRequestBody body) {
+        this.callerMethod = callerMethod;
+        this.httpMethod = httpMethod;
+        this.url = url;
+        this.headers = headers;
+        this.body = body;
     }
 
     /**
@@ -110,13 +120,5 @@ public class HttpRequest {
      */
     public HttpRequestBody body() {
         return body;
-    }
-
-    /**
-     * Get the assigned MIME type for this HttpRequest's body.
-     * @return The assigned MIME type for this HttpRequest's body.
-     */
-    public String mimeContentType() {
-        return body == null ? null : body.contentType();
     }
 }

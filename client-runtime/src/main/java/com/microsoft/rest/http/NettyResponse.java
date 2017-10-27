@@ -12,8 +12,10 @@ import io.netty.util.ReferenceCountUtil;
 import rx.Observable;
 import rx.Single;
 import rx.functions.Func1;
+import rx.subjects.PublishSubject;
 
 import java.io.InputStream;
+import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
 import java.util.List;
 import java.util.Map.Entry;
@@ -111,6 +113,41 @@ class NettyResponse extends HttpResponse {
                 return toByteArray(byteBuf);
             }
         });
+    }
+
+    @Override
+    public Observable<ByteBuffer> streamBodyNioAsync() {
+        // TODO: determine if this leaks memory
+        return emitter.flatMap(new Func1<ByteBuf, Observable<ByteBuffer>>() {
+            @Override
+            public Observable<ByteBuffer> call(ByteBuf byteBuf) {
+                Observable<ByteBuffer> result;
+                int bufferCount = byteBuf.nioBufferCount();
+                if (bufferCount == -1) {
+                    ByteBuffer byteBuffer = ByteBuffer.allocate(byteBuf.readableBytes());
+                    byteBuf.readBytes(byteBuffer);
+                    result = Observable.just(byteBuffer);
+                } else if (bufferCount == 1) {
+                    result = Observable.just(byteBuf.nioBuffer());
+                } else {
+                    result = Observable.from(byteBuf.nioBuffers());
+                }
+
+                byteBuf.release();
+                return result;
+            }
+        });
+
+        // Maybe needed to prevent memory leak
+//        return emitter.map(new Func1<ByteBuf, ByteBuffer>() {
+//            @Override
+//            public ByteBuffer call(ByteBuf byteBuf) {
+//                ByteBuffer ret = ByteBuffer.allocate(byteBuf.readableBytes());
+//                byteBuf.readBytes(ret);
+//                byteBuf.release();
+//                return ret;
+//            }
+//        });
     }
 
     @Override
