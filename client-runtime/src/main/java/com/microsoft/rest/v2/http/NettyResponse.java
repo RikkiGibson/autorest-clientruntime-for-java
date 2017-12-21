@@ -6,6 +6,8 @@
 
 package com.microsoft.rest.v2.http;
 
+import com.google.common.base.Charsets;
+import com.microsoft.rest.v2.util.FlowableUtil;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.util.ReferenceCountUtil;
@@ -14,6 +16,7 @@ import io.reactivex.Single;
 import io.reactivex.functions.Function;
 
 import java.io.InputStream;
+import java.nio.channels.Channel;
 import java.nio.charset.Charset;
 import java.util.List;
 import java.util.Map.Entry;
@@ -26,17 +29,18 @@ class NettyResponse extends HttpResponse {
     private final io.netty.handler.codec.http.HttpResponse rxnRes;
     private final long contentLength;
     private final Flowable<ByteBuf> contentStream;
+    private boolean isSubscribed = false;
 
-    NettyResponse(io.netty.handler.codec.http.HttpResponse rxnRes, Flowable<ByteBuf> emitter) {
-        this.rxnRes = rxnRes;
-        this.contentLength = getContentLength(rxnRes);
+    NettyResponse(io.netty.handler.codec.http.HttpResponse nettyRes, Flowable<ByteBuf> emitter) {
+        this.rxnRes = nettyRes;
+        this.contentLength = getContentLength(nettyRes);
         this.contentStream = emitter;
     }
 
-    private static long getContentLength(io.netty.handler.codec.http.HttpResponse rxnRes) {
+    private static long getContentLength(io.netty.handler.codec.http.HttpResponse nettyRes) {
         long result;
         try {
-            result = Long.parseLong(rxnRes.headers().get(HEADER_CONTENT_LENGTH));
+            result = Long.parseLong(nettyRes.headers().get(HEADER_CONTENT_LENGTH));
         } catch (NullPointerException | NumberFormatException e) {
             result = 0;
         }
@@ -62,37 +66,12 @@ class NettyResponse extends HttpResponse {
         return headers;
     }
 
-    private Single<ByteBuf> collectContent() {
-        return contentStream.toList().map(new Function<List<ByteBuf>, ByteBuf>() {
-            @Override
-            public ByteBuf apply(List<ByteBuf> l) {
-                ByteBuf[] bufs = new ByteBuf[l.size()];
-                return Unpooled.wrappedBuffer(l.toArray(bufs));
-            }
-        });
-    }
-
-    @Override
-    public Single<? extends InputStream> bodyAsInputStreamAsync() {
-        return collectContent().map(new Function<ByteBuf, InputStream>() {
-            @Override
-            public InputStream apply(ByteBuf byteBuf) {
-                return new ClosableByteBufInputStream(byteBuf);
-            }
-        });
-    }
-
     @Override
     public Single<byte[]> bodyAsByteArrayAsync() {
-        return collectContent().map(new Function<ByteBuf, byte[]>() {
-            @Override
-            public byte[] apply(ByteBuf byteBuf) {
-                return toByteArray(byteBuf);
-            }
-        });
+        return FlowableUtil.collectBytes(streamBodyAsync());
     }
 
-    static byte[] toByteArray(ByteBuf byteBuf) {
+    private static byte[] toByteArray(ByteBuf byteBuf) {
         if (byteBuf.hasArray()) {
             return byteBuf.array();
         } else {
@@ -105,6 +84,7 @@ class NettyResponse extends HttpResponse {
 
     @Override
     public Flowable<byte[]> streamBodyAsync() {
+        isSubscribed = true;
         return contentStream.map(new Function<ByteBuf, byte[]>() {
             @Override
             public byte[] apply(ByteBuf byteBuf) {
@@ -115,28 +95,25 @@ class NettyResponse extends HttpResponse {
 
     @Override
     public Single<String> bodyAsStringAsync() {
-        return collectContent().map(new Function<ByteBuf, String>() {
+        isSubscribed = true;
+        return contentStream.toList().map(new Function<List<ByteBuf>, String>() {
             @Override
-            public String apply(ByteBuf byteBuf) {
-                return byteBuf.toString(Charset.defaultCharset());
+            public String apply(List<ByteBuf> l) {
+                ByteBuf[] bufs = new ByteBuf[l.size()];
+                String result = Unpooled.wrappedBuffer(l.toArray(bufs)).toString(Charsets.UTF_8);
+                for (ByteBuf buf : bufs) {
+                    buf.release();
+                }
+                return result;
             }
         });
     }
 
-    /**
-     * Extends the ByreBufInputStream so that underlying ByteBuf can be returned to pool.
-     */
-    private class ClosableByteBufInputStream extends io.netty.buffer.ByteBufInputStream {
-        private final ByteBuf buffer;
-
-        ClosableByteBufInputStream(ByteBuf buffer) {
-            super(buffer);
-            this.buffer = buffer;
-        }
-
-        @Override
-        public void close() {
-            ReferenceCountUtil.release(this.buffer);
+    @Override
+    public void close() {
+        if (!isSubscribed) {
+            isSubscribed = true;
+            streamBodyAsync().subscribe().dispose();
         }
     }
 }

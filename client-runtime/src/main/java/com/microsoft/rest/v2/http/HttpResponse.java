@@ -8,7 +8,9 @@ package com.microsoft.rest.v2.http;
 
 import io.reactivex.Flowable;
 import io.reactivex.Single;
+import io.reactivex.disposables.Disposable;
 
+import java.io.Closeable;
 import java.io.InputStream;
 
 /**
@@ -35,14 +37,6 @@ public abstract class HttpResponse {
      * @return All headers on this HTTP response.
      */
     public abstract HttpHeaders headers();
-
-    /**
-     * Get this response object's body as an InputStream. If this response object doesn't have a
-     * body, then null will be returned.
-     * @return This response object's body as an InputStream. If this response object doesn't have a
-     * body, then null will be returned.
-     */
-    public abstract Single<? extends InputStream> bodyAsInputStreamAsync();
 
     /**
      * Get this response object's body as a byte[]. If this response object doesn't have a body,
@@ -73,4 +67,10 @@ public abstract class HttpResponse {
     public HttpResponse buffer() {
         return new BufferedHttpResponse(this);
     }
+
+    /**
+     * Closes the connection associated with this HTTP response.
+     * If response content has already been subscribed to, this method does nothing. Instead, call dispose() on the return value of subscribe().
+     */
+    public abstract void close();
 }

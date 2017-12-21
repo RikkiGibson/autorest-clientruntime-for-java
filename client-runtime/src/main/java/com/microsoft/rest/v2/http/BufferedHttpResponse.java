@@ -6,11 +6,14 @@
 
 package com.microsoft.rest.v2.http;
 
+import com.google.common.base.Charsets;
+import com.microsoft.rest.v2.util.FlowableUtil;
 import io.reactivex.Flowable;
 import io.reactivex.Single;
 import io.reactivex.functions.Function;
 
 import java.io.ByteArrayInputStream;
+import java.io.IOException;
 import java.io.InputStream;
 
 /**
@@ -18,7 +21,7 @@ import java.io.InputStream;
  */
 public final class BufferedHttpResponse extends HttpResponse {
     private final HttpResponse innerHttpResponse;
-    private Single<byte[]> body;
+    private final Single<byte[]> body;
 
     /**
      * Creates a buffered HTTP response.
@@ -26,7 +29,7 @@ public final class BufferedHttpResponse extends HttpResponse {
      */
     public BufferedHttpResponse(HttpResponse innerHttpResponse) {
         this.innerHttpResponse = innerHttpResponse;
-        this.body = null;
+        this.body = FlowableUtil.collectBytes(innerHttpResponse.streamBodyAsync().replay().autoConnect());
     }
 
     @Override
@@ -45,50 +48,32 @@ public final class BufferedHttpResponse extends HttpResponse {
     }
 
     @Override
-    public Single<? extends InputStream> bodyAsInputStreamAsync() {
-        return bodyAsByteArrayAsync()
-            .map(new Function<byte[], InputStream>() {
-                @Override
-                public InputStream apply(byte[] bytes) {
-                    return new ByteArrayInputStream(bytes);
-                }
-            });
-    }
-
-    @Override
     public Single<byte[]> bodyAsByteArrayAsync() {
-        if (body == null) {
-            body = innerHttpResponse.bodyAsByteArrayAsync()
-                    .map(new Function<byte[], byte[]>() {
-                        @Override
-                        public byte[] apply(byte[] bytes) {
-                            body = Single.just(bytes);
-                            return bytes;
-                        }
-                    });
-        }
         return body;
     }
 
     @Override
     public Flowable<byte[]> streamBodyAsync() {
-        // FIXME: maybe need to enable streaming/collecting in here
-        return bodyAsByteArrayAsync().toFlowable();
+        return body.toFlowable();
     }
 
     @Override
     public Single<String> bodyAsStringAsync() {
-        return bodyAsByteArrayAsync()
-                .map(new Function<byte[], String>() {
-                    @Override
-                    public String apply(byte[] bytes) {
-                        return bytes == null ? null : new String(bytes);
-                    }
-                });
+        return body.map(new Function<byte[], String>() {
+            @Override
+            public String apply(byte[] bytes) throws Exception {
+                return new String(bytes, Charsets.UTF_8);
+            }
+        });
     }
 
     @Override
     public BufferedHttpResponse buffer() {
         return this;
+    }
+
+    @Override
+    public void close() {
+        innerHttpResponse.close();
     }
 }

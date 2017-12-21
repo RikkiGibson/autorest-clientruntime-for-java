@@ -11,6 +11,7 @@ import io.reactivex.Flowable;
 import io.reactivex.functions.BiConsumer;
 import io.reactivex.functions.Function;
 
+import java.io.Closeable;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
@@ -21,7 +22,7 @@ import java.util.concurrent.Callable;
 /**
  * Represents an asynchronous input stream with a content length.
  */
-public final class AsyncInputStream {
+public class AsyncInputStream implements Closeable {
     private static final int CHUNK_SIZE = 8192;
     private final Flowable<byte[]> content;
     private final long contentLength;
@@ -43,14 +44,14 @@ public final class AsyncInputStream {
     /**
      * @return The flowable which emits the stream content.
      */
-    public Flowable<byte[]> content() {
+    public final Flowable<byte[]> content() {
         return content;
     }
 
     /**
      * @return The total length of the stream content.
      */
-    public long contentLength() {
+    public final long contentLength() {
         return contentLength;
     }
 
@@ -58,8 +59,13 @@ public final class AsyncInputStream {
      * @return a value indicating whether the content Flowable contained
      *         in this AsyncInputStream supports multiple subscription
      */
-    public boolean isReplayable() {
+    public final boolean isReplayable() {
         return isReplayable;
+    }
+
+    @Override
+    public void close() throws IOException {
+        // no-op
     }
 
     /**

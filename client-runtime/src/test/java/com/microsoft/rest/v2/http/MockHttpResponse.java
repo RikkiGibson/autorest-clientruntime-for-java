@@ -78,11 +78,6 @@ public class MockHttpResponse extends HttpResponse {
     }
 
     @Override
-    public Single<? extends InputStream> bodyAsInputStreamAsync() {
-        return Single.just(new ByteArrayInputStream(bodyBytes));
-    }
-
-    @Override
     public Single<byte[]> bodyAsByteArrayAsync() {
         return Single.just(bodyBytes);
     }
@@ -95,5 +90,10 @@ public class MockHttpResponse extends HttpResponse {
     @Override
     public Single<String> bodyAsStringAsync() {
         return Single.just(bodyBytes == null ? "" : new String(bodyBytes));
+    }
+
+    @Override
+    public void close() {
+        // no-op
     }
 }

@@ -477,8 +477,6 @@ public class RestProxy implements InvocationHandler {
                 && (entityTypeToken.isSubtypeOf(boolean.class) || entityTypeToken.isSubtypeOf(Boolean.class))) {
             boolean isSuccess = (responseStatusCode / 100) == 2;
             asyncResult = Maybe.just(isSuccess);
-        } else if (entityTypeToken.isSubtypeOf(InputStream.class)) {
-            asyncResult = response.bodyAsInputStreamAsync().toMaybe();
         } else if (entityTypeToken.isSubtypeOf(byte[].class)) {
             Maybe<byte[]> responseBodyBytesAsync = response.bodyAsByteArrayAsync().toMaybe();
             if (returnValueWireType == Base64Url.class) {

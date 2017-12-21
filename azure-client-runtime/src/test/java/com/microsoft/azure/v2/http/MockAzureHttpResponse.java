@@ -72,11 +72,6 @@ public class MockAzureHttpResponse extends HttpResponse {
     }
 
     @Override
-    public Single<? extends InputStream> bodyAsInputStreamAsync() {
-        return Single.just(new ByteArrayInputStream(bodyBytes));
-    }
-
-    @Override
     public Single<byte[]> bodyAsByteArrayAsync() {
         return Single.just(bodyBytes);
     }
@@ -89,6 +84,11 @@ public class MockAzureHttpResponse extends HttpResponse {
     @Override
     public Single<String> bodyAsStringAsync() {
         return Single.just(new String(bodyBytes));
+    }
+
+    @Override
+    public void close() {
+        // no-op
     }
 
     public MockAzureHttpResponse withHeader(String headerName, String headerValue) {
