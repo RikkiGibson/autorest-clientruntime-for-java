@@ -149,4 +149,14 @@ public final class AsyncInputStream {
     public static AsyncInputStream create(byte[] bytes) {
         return new AsyncInputStream(Flowable.just(bytes), bytes.length, true);
     }
+
+    /**
+     * If {@link #isReplayable()} is false, this disposes of the content stream and related resources.
+     * Otherwise, this method does nothing.
+     */
+    public void dispose() {
+        if (!isReplayable) {
+            content.subscribe().dispose();
+        }
+    }
 }
