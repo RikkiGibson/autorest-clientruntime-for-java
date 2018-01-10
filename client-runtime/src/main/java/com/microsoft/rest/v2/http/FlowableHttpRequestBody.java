@@ -7,6 +7,7 @@
 package com.microsoft.rest.v2.http;
 
 import io.reactivex.Flowable;
+import io.reactivex.Observer;
 
 import java.io.IOException;
 
@@ -17,8 +18,9 @@ public final class FlowableHttpRequestBody implements HttpRequestBody {
     private final long contentLength;
     private final String contentType;
 
-    private boolean isReplayable;
     private Flowable<byte[]> content;
+    private boolean isReplayable;
+    private Observer<UploadProgress> uploadProgressObserver;
 
     /**
      * Create a new FlowableHttpRequestBody.
@@ -56,5 +58,10 @@ public final class FlowableHttpRequestBody implements HttpRequestBody {
             isReplayable = true;
         }
         return this;
+    }
+
+    @Override
+    public Observer<UploadProgress> uploadProgressObserver() {
+        return uploadProgressObserver;
     }
 }

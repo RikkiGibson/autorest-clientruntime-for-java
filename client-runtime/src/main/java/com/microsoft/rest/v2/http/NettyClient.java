@@ -37,11 +37,11 @@ import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.GenericFutureListener;
 import io.reactivex.Flowable;
 import io.reactivex.FlowableSubscriber;
+import io.reactivex.Observer;
 import io.reactivex.Scheduler;
 import io.reactivex.Single;
 import io.reactivex.SingleEmitter;
 import io.reactivex.SingleOnSubscribe;
-import io.reactivex.exceptions.Exceptions;
 import io.reactivex.disposables.Disposable;
 import io.reactivex.functions.Function;
 import io.reactivex.schedulers.Schedulers;
@@ -310,6 +310,7 @@ public final class NettyClient extends HttpClient {
 
                             } else {
                                 Flowable<ByteBuf> bodyContent;
+                                long size;
                                 if (request.body() instanceof FileRequestBody) {
                                     bodyContent = ((FileRequestBody) request.body()).pooledContent();
                                 } else {
@@ -321,7 +322,10 @@ public final class NettyClient extends HttpClient {
                                     });
                                 }
                                 bodyContent.observeOn(Schedulers.from(channel.eventLoop())).subscribe(new FlowableSubscriber<ByteBuf>() {
+                                    Observer<UploadProgress> progressObserver = request.body().uploadProgressObserver();
                                     Subscription subscription;
+                                    long bytesUploaded = 0;
+
                                     @Override
                                     public void onSubscribe(Subscription s) {
                                         subscription = s;
@@ -336,7 +340,10 @@ public final class NettyClient extends HttpClient {
                                                     if (!future.isSuccess()) {
                                                         subscription.cancel();
                                                         channelPool.closeAndRelease(channel);
+
+                                                        // emit same error through upload progress?
                                                         emitErrorIfSubscribed(future.cause());
+                                                    } else {
                                                     }
                                                 }
                                             };
@@ -346,8 +353,15 @@ public final class NettyClient extends HttpClient {
                                         if (!channel.eventLoop().inEventLoop()) {
                                             throw new IllegalStateException("onNext must be called from the event loop managing the channel.");
                                         }
+
+                                        bytesUploaded += buf.readableBytes();
                                         channel.writeAndFlush(new DefaultHttpContent(buf))
                                                 .addListener(onChannelWriteComplete);
+
+                                        // TODO: this really should be in onChannelWriteComplete, but it will need to close over it instead of just being in local scope
+                                        if (progressObserver != null) {
+                                            progressObserver.onNext(new UploadProgress(bytesUploaded, request.body().contentLength(), request.url()));
+                                        }
 
                                         if (channel.isWritable()) {
                                             subscription.request(1);
@@ -371,6 +385,9 @@ public final class NettyClient extends HttpClient {
                                                             channelPool.closeAndRelease(channel);
                                                             emitErrorIfSubscribed(future.cause());
                                                         } else {
+                                                            if (progressObserver != null) {
+                                                                progressObserver.onComplete();
+                                                            }
                                                             channel.read();
                                                         }
                                                     }
@@ -388,7 +405,7 @@ public final class NettyClient extends HttpClient {
                         LoggerFactory.getLogger(getClass()).warn("Got EncoderException: " + throwable.getMessage());
                         return sendRequestInternalAsync(request, proxy);
                     } else {
-                        throw Exceptions.propagate(throwable);
+                        return Single.error(throwable);
                     }
                 }
             });

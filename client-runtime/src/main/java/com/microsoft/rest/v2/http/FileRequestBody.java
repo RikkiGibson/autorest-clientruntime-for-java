@@ -10,6 +10,7 @@ import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
 import io.reactivex.Emitter;
 import io.reactivex.Flowable;
+import io.reactivex.Observer;
 import io.reactivex.functions.BiConsumer;
 
 import java.io.IOException;
@@ -24,14 +25,17 @@ import java.util.concurrent.Callable;
 public class FileRequestBody implements HttpRequestBody {
     private static final int CHUNK_SIZE = 8192;
     private final FileSegment fileSegment;
+    private final Observer<UploadProgress> uploadProgressObserver;
 
     /**
      * Create a new FileHttpRequestBody with the provided file.
      *
      * @param fileSegment the segment of file as the request body
+     * @param uploadProgressObserver The observer which will receive upload progress notifications.
      */
-    public FileRequestBody(FileSegment fileSegment) {
+    public FileRequestBody(FileSegment fileSegment, Observer<UploadProgress> uploadProgressObserver) {
         this.fileSegment = fileSegment;
+        this.uploadProgressObserver = uploadProgressObserver;
     }
 
     @Override
@@ -131,6 +135,11 @@ public class FileRequestBody implements HttpRequestBody {
     @Override
     public HttpRequestBody buffer() {
         return this;
+    }
+
+    @Override
+    public Observer<UploadProgress> uploadProgressObserver() {
+        return uploadProgressObserver;
     }
 
     /**

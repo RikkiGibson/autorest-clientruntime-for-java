@@ -317,9 +317,10 @@ public class RestProxy implements InvocationHandler {
             else if (bodyContentObject instanceof AsyncInputStream) {
                 AsyncInputStream stream = (AsyncInputStream) bodyContentObject;
                 request.withBody(new FlowableHttpRequestBody(stream.contentLength(), contentType, stream.content(), stream.isReplayable()));
+                request.withProgressObserver(stream.progressObserver());
             }
             else if (bodyContentObject instanceof FileSegment) {
-                request.withBody(new FileRequestBody((FileSegment) bodyContentObject));
+                request.withBody(new FileRequestBody((FileSegment) bodyContentObject, null)); // TODO: upload progress
             }
             else if (bodyContentObject instanceof byte[]) {
                 request.withBody((byte[]) bodyContentObject, contentType);
@@ -496,7 +497,8 @@ public class RestProxy implements InvocationHandler {
             AsyncInputStream stream = new AsyncInputStream(
                     response.streamBodyAsync(),
                     Integer.parseInt(response.headerValue("Content-Length")),
-                    false);
+                    false,
+                    null); // no upload progress when we're downloading...
             asyncResult = Maybe.just(stream);
         } else if (isFlowableByteArray(entityTypeToken)) {
             asyncResult = Maybe.just(response.streamBodyAsync());

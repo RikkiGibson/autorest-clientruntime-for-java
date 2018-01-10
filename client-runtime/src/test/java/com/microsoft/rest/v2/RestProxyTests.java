@@ -1373,7 +1373,7 @@ public abstract class RestProxyTests {
         Path filePath = Paths.get(getClass().getClassLoader().getResource("upload.txt").toURI());
         AsynchronousFileChannel fileChannel = AsynchronousFileChannel.open(filePath, StandardOpenOption.READ);
         RestResponse<Void, HttpBinJSON> response = createService(FlowableUploadService.class)
-                .put(AsyncInputStream.create(fileChannel, 4, 15));
+                .put(AsyncInputStream.create(fileChannel, 4, 15, null));
 
         assertEquals("quick brown fox", response.body().data);
     }

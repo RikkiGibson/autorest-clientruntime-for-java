@@ -21,8 +21,11 @@ import io.reactivex.Completable;
 import io.reactivex.CompletableSource;
 import io.reactivex.Emitter;
 import io.reactivex.Flowable;
+import io.reactivex.Observable;
+import io.reactivex.Observer;
 import io.reactivex.Single;
 import io.reactivex.SingleSource;
+import io.reactivex.disposables.Disposable;
 import io.reactivex.exceptions.Exceptions;
 import io.reactivex.functions.Action;
 import io.reactivex.functions.BiConsumer;
@@ -30,7 +33,11 @@ import io.reactivex.functions.BiFunction;
 import io.reactivex.functions.Consumer;
 import io.reactivex.functions.Function;
 import io.reactivex.internal.functions.Functions;
+import io.reactivex.observables.GroupedObservable;
 import io.reactivex.schedulers.Schedulers;
+import io.reactivex.subjects.BehaviorSubject;
+import io.reactivex.subjects.Subject;
+import io.reactivex.subjects.UnicastSubject;
 import org.joda.time.DateTime;
 import org.joda.time.Duration;
 import org.joda.time.Instant;
@@ -59,11 +66,14 @@ import java.nio.file.SimpleFileVisitor;
 import java.nio.file.StandardOpenOption;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.security.MessageDigest;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 import java.util.Random;
 import java.util.concurrent.*;
 
+import static java.util.Collections.synchronizedList;
 import static org.junit.Assert.assertArrayEquals;
 
 @SuppressWarnings("Duplicates")
@@ -133,7 +143,7 @@ public class RestProxyStressTests {
                             return sendAsync(request);
                         }
                         LoggerFactory.getLogger(getClass()).warn("Unrecoverable exception occurred: " + throwable.getMessage());
-                        throw Exceptions.propagate(throwable);
+                        return Single.error(throwable);
                     }
                 });
             }
@@ -155,8 +165,8 @@ public class RestProxyStressTests {
     }
 
     private static final Path TEMP_FOLDER_PATH = Paths.get("temp");
-    private static final int NUM_FILES = 100;
-    private static final int FILE_SIZE = 1024 * 1024 * 100;
+    private static final int NUM_FILES = 1;
+    private static final int FILE_SIZE = 1024 * 1024;
     private static final int CHUNK_SIZE = 8192;
     private static final int CHUNKS_PER_FILE = FILE_SIZE / CHUNK_SIZE;
 
@@ -259,13 +269,19 @@ public class RestProxyStressTests {
                     }
                 }).toList().blockingGet();
 
+        final List<Observable<UploadProgress>> allProgress = Collections.synchronizedList(new ArrayList<Observable<UploadProgress>>());
+
         Instant start = Instant.now();
         Flowable.range(0, NUM_FILES)
                 .zipWith(md5s, new BiFunction<Integer, byte[], Completable>() {
                     @Override
                     public Completable apply(Integer id, final byte[] md5) throws Exception {
                         final AsynchronousFileChannel fileStream = AsynchronousFileChannel.open(TEMP_FOLDER_PATH.resolve("100m-" + id + ".dat"));
-                        AsyncInputStream stream = AsyncInputStream.create(fileStream);
+
+                        final Subject<UploadProgress> progress = BehaviorSubject.create();
+                        allProgress.add(progress);
+
+                        final AsyncInputStream stream = AsyncInputStream.create(fileStream, progress);
                         return service.upload100MB(String.valueOf(id), sas, "BlockBlob", stream).flatMapCompletable(new Function<RestResponse<Void, Void>, CompletableSource>() {
                             @Override
                             public CompletableSource apply(RestResponse<Void, Void> response) throws Exception {
@@ -430,7 +446,7 @@ public class RestProxyStressTests {
 
                         // A download stream which is allowed to issue an HTTP request when subscribed
                         // can't know for certain what the content length is each time a request is made.
-                        AsyncInputStream toSend = new AsyncInputStream(downloadContent, FILE_SIZE, true);
+                        AsyncInputStream toSend = new AsyncInputStream(downloadContent, FILE_SIZE, true, null);
                         return service.upload100MB("copy-" + integer, sas, "BlockBlob", toSend).flatMapCompletable(new Function<RestResponse<Void, Void>, CompletableSource>() {
                             @Override
                             public CompletableSource apply(RestResponse<Void, Void> uploadResponse) throws Exception {

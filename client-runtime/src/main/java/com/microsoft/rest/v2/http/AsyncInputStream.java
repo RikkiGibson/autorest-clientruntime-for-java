@@ -8,6 +8,7 @@ package com.microsoft.rest.v2.http;
 
 import io.reactivex.Emitter;
 import io.reactivex.Flowable;
+import io.reactivex.Observer;
 import io.reactivex.functions.BiConsumer;
 import io.reactivex.internal.util.BackpressureHelper;
 import io.reactivex.schedulers.Schedulers;
@@ -31,6 +32,7 @@ public final class AsyncInputStream {
     private final Flowable<byte[]> content;
     private final long contentLength;
     private final boolean isReplayable;
+    private final Observer<UploadProgress> uploadProgressObserver;
 
     /**
      * Creates an AsyncInputStream.
@@ -38,11 +40,13 @@ public final class AsyncInputStream {
      * @param contentLength The total length of the stream content.
      * @param isReplayable indicates whether the flowable allows multiple subscription.
      *                     Used as a hint for whether to buffer flowable content when retrying.
+     * @param uploadProgressObserver optional observer which receives upload progress notifications.
      */
-    public AsyncInputStream(Flowable<byte[]> flowable, long contentLength, boolean isReplayable) {
+    public AsyncInputStream(Flowable<byte[]> flowable, long contentLength, boolean isReplayable, Observer<UploadProgress> uploadProgressObserver) {
         this.content = flowable;
         this.contentLength = contentLength;
         this.isReplayable = isReplayable;
+        this.uploadProgressObserver = uploadProgressObserver;
     }
 
     /**
@@ -68,16 +72,24 @@ public final class AsyncInputStream {
     }
 
     /**
+     * @return the optional observer which should receive upload progress notifications
+     */
+    public Observer<UploadProgress> progressObserver() {
+        return uploadProgressObserver;
+    }
+
+    /**
      * Creates an AsyncInputStream from an AsynchronousFileChannel.
      *
      * @param fileChannel The file channel.
      * @param offset The offset in the file to begin reading.
      * @param length The number of bytes of data to read from the file.
+     * @param progressObserver The observer which will receive upload progress notifications.
      * @return The AsyncInputStream.
      */
-    public static AsyncInputStream create(final AsynchronousFileChannel fileChannel, final long offset, final long length) {
+    public static AsyncInputStream create(final AsynchronousFileChannel fileChannel, final long offset, final long length, Observer<UploadProgress> progressObserver) {
         Flowable<byte[]> fileStream = new FileReadFlowable(fileChannel, offset, length);
-        return new AsyncInputStream(fileStream, length, true);
+        return new AsyncInputStream(fileStream, length, true, progressObserver);
     }
 
     /**
@@ -88,7 +100,19 @@ public final class AsyncInputStream {
      */
     public static AsyncInputStream create(AsynchronousFileChannel fileChannel) throws IOException {
         long size = fileChannel.size();
-        return create(fileChannel, 0, size);
+        return create(fileChannel, 0, size, null);
+    }
+
+    /**
+     * Creates an AsyncInputStream from an AsynchronousFileChannel which reads the entire file.
+     * @param fileChannel The file channel.
+     * @param progressObserver The observer which will receive upload progress notifications.
+     * @throws IOException if an error occurs when determining file size
+     * @return The AsyncInputStream.
+     */
+    public static AsyncInputStream create(AsynchronousFileChannel fileChannel, Observer<UploadProgress> progressObserver) throws IOException {
+        long size = fileChannel.size();
+        return create(fileChannel, 0, size, progressObserver);
     }
 
     private static class FileReadFlowable extends Flowable<byte[]> {
@@ -201,7 +225,7 @@ public final class AsyncInputStream {
                     }
                 }).observeOn(Schedulers.io());
 
-        return new AsyncInputStream(content, contentLength, false);
+        return new AsyncInputStream(content, contentLength, false, null);
     }
 
     /**
@@ -210,6 +234,6 @@ public final class AsyncInputStream {
      * @return the AsyncInputStream
      */
     public static AsyncInputStream create(byte[] bytes) {
-        return new AsyncInputStream(Flowable.just(bytes), bytes.length, true);
+        return new AsyncInputStream(Flowable.just(bytes), bytes.length, true, null);
     }
 }

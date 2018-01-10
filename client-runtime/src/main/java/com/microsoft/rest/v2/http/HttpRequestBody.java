@@ -7,6 +7,7 @@
 package com.microsoft.rest.v2.http;
 
 import io.reactivex.Flowable;
+import io.reactivex.Observer;
 
 import java.io.IOException;
 
@@ -38,4 +39,10 @@ public interface HttpRequestBody {
      * @throws IOException if there is a problem buffering.
      */
     HttpRequestBody buffer() throws IOException;
+
+    /**
+     * Get the observer which will be notified of upload progress events.
+     * @return the observer
+     */
+    Observer<UploadProgress> uploadProgressObserver();
 }
