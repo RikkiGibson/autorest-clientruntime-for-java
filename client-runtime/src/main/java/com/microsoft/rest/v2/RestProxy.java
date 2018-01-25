@@ -17,6 +17,7 @@ import com.microsoft.rest.v2.http.HttpPipeline;
 import com.microsoft.rest.v2.http.HttpPipelineBuilder;
 import com.microsoft.rest.v2.http.HttpRequest;
 import com.microsoft.rest.v2.http.HttpResponse;
+import com.microsoft.rest.v2.http.PooledBuffer;
 import com.microsoft.rest.v2.http.UrlBuilder;
 import com.microsoft.rest.v2.policy.CookiePolicyFactory;
 import com.microsoft.rest.v2.policy.CredentialsPolicyFactory;
@@ -27,6 +28,7 @@ import com.microsoft.rest.v2.protocol.HttpResponseDecoder;
 import com.microsoft.rest.v2.protocol.SerializerAdapter;
 import com.microsoft.rest.v2.protocol.SerializerEncoding;
 import com.microsoft.rest.v2.serializer.JacksonAdapter;
+import com.microsoft.rest.v2.util.FlowableUtil;
 import io.reactivex.Completable;
 import io.reactivex.Flowable;
 import io.reactivex.Maybe;
@@ -186,10 +188,10 @@ public class RestProxy implements InvocationHandler {
                 final String bodyContentString = serializer.serialize(bodyContentObject, SerializerEncoding.JSON);
                 request.withBody(bodyContentString);
             }
-            else if (isFlowableByteArray(TypeToken.of(methodParser.bodyJavaType()))) {
-                // Content-Length or Transfer-Encoding: chunked must be provided by a user-specified header when a Flowable<byte[]> is given for the body.
+            else if (FlowableUtil.isFlowableByteArray(TypeToken.of(methodParser.bodyJavaType()))) {
+                // Content-Length or Transfer-Encoding: chunked must be provided by a user-specified header when a Flowable<PooledBuffer> is given for the body.
                 //noinspection ConstantConditions
-                request.withBody((Flowable<byte[]>) bodyContentObject);
+                request.withBody((Flowable<PooledBuffer>) bodyContentObject);
             }
             else if (bodyContentObject instanceof byte[]) {
                 request.withBody((byte[]) bodyContentObject);
@@ -329,17 +331,6 @@ public class RestProxy implements InvocationHandler {
         return asyncResult;
     }
 
-    private boolean isFlowableByteArray(TypeToken entityTypeToken) {
-        if (entityTypeToken.isSubtypeOf(Flowable.class)) {
-            final Type innerType = ((ParameterizedType) entityTypeToken.getType()).getActualTypeArguments()[0];
-            final TypeToken innerTypeToken = TypeToken.of(innerType);
-            if (innerTypeToken.isSubtypeOf(byte[].class)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
     protected final Maybe<?> handleBodyReturnTypeAsync(final HttpResponse response, final SwaggerMethodParser methodParser, final Type entityType) {
         final TypeToken entityTypeToken = TypeToken.of(entityType);
         final int responseStatusCode = response.statusCode();
@@ -362,7 +353,7 @@ public class RestProxy implements InvocationHandler {
                 });
             }
             asyncResult = responseBodyBytesAsync;
-        } else if (isFlowableByteArray(entityTypeToken)) {
+        } else if (FlowableUtil.isFlowableByteArray(entityTypeToken)) {
             asyncResult = Maybe.just(response.streamBodyAsync());
         } else {
             Object result = response.deserializedBody();
@@ -380,7 +371,7 @@ public class RestProxy implements InvocationHandler {
         return handleRestReturnType(httpRequest, asyncHttpResponse, methodParser, returnType);
     }
 
-    private static final Function<Throwable, Single<?>> warnMissingDecoding = new Function<Throwable, Single<?>>() {
+    private static final Function<Throwable, Single<?>> WARN_MISSING_DECODING = new Function<Throwable, Single<?>>() {
         @Override
         public Single<?> apply(Throwable throwable) throws Exception {
             if (throwable instanceof NoSuchElementException) {
@@ -416,12 +407,12 @@ public class RestProxy implements InvocationHandler {
                 public Single<?> apply(HttpResponse response) throws Exception {
                     return handleRestResponseReturnTypeAsync(response, methodParser, singleTypeParam);
                 }
-            }).onErrorResumeNext(warnMissingDecoding);
+            }).onErrorResumeNext(WARN_MISSING_DECODING);
         }
         else if (returnTypeToken.isSubtypeOf(Observable.class)) {
             throw new InvalidReturnTypeException("RestProxy does not support swagger interface methods (such as " + methodParser.fullyQualifiedMethodName() + "()) with a return type of " + returnType.toString());
         }
-        else if (isFlowableByteArray(returnTypeToken)) {
+        else if (FlowableUtil.isFlowableByteArray(returnTypeToken)) {
             result = asyncExpectedResponse.flatMapPublisher(new Function<HttpResponse, Publisher<?>>() {
                 @Override
                 public Publisher<?> apply(HttpResponse httpResponse) throws Exception {
@@ -441,7 +432,7 @@ public class RestProxy implements InvocationHandler {
                         public Single<?> apply(HttpResponse httpResponse) throws Exception {
                             return handleRestResponseReturnTypeAsync(httpResponse, methodParser, returnType);
                         }
-                    }).onErrorResumeNext(warnMissingDecoding).blockingGet();
+                    }).onErrorResumeNext(WARN_MISSING_DECODING).blockingGet();
         }
 
         return result;

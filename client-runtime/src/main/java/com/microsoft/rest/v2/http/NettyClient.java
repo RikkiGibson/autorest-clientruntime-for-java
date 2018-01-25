@@ -8,7 +8,6 @@ package com.microsoft.rest.v2.http;
 
 import io.netty.bootstrap.Bootstrap;
 import io.netty.buffer.ByteBuf;
-import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
@@ -282,14 +281,9 @@ public final class NettyClient extends HttpClient {
                                             }
                                         });
                             } else {
-                                Flowable<ByteBuf> byteBufContent = request.body().map(new Function<byte[], ByteBuf>() {
-                                    @Override
-                                    public ByteBuf apply(byte[] bytes) throws Exception {
-                                        return Unpooled.wrappedBuffer(bytes);
-                                    }
-                                });
+                                Flowable<PooledBuffer> byteBufContent = request.body();
 
-                                byteBufContent.observeOn(Schedulers.from(channel.eventLoop())).subscribe(new FlowableSubscriber<ByteBuf>() {
+                                byteBufContent.observeOn(Schedulers.from(channel.eventLoop())).subscribe(new FlowableSubscriber<PooledBuffer>() {
                                     Subscription subscription;
                                     @Override
                                     public void onSubscribe(Subscription s) {
@@ -311,11 +305,11 @@ public final class NettyClient extends HttpClient {
                                             };
 
                                     @Override
-                                    public void onNext(ByteBuf buf) {
+                                    public void onNext(PooledBuffer buf) {
                                         if (!channel.eventLoop().inEventLoop()) {
                                             throw new IllegalStateException("onNext must be called from the event loop managing the channel.");
                                         }
-                                        channel.writeAndFlush(new DefaultHttpContent(buf))
+                                        channel.writeAndFlush(new DefaultHttpContent(buf.byteBuf()))
                                                 .addListener(onChannelWriteComplete);
 
                                         if (channel.isWritable()) {

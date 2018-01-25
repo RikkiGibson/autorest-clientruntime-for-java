@@ -83,8 +83,8 @@ public class MockHttpResponse extends HttpResponse {
     }
 
     @Override
-    public Flowable<byte[]> streamBodyAsync() {
-        return Flowable.just(bodyBytes);
+    public Flowable<PooledBuffer> streamBodyAsync() {
+        return Flowable.just(PooledBuffer.wrap(bodyBytes));
     }
 
     @Override

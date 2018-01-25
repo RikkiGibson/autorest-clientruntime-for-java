@@ -10,9 +10,6 @@ import io.reactivex.Flowable;
 import io.reactivex.Single;
 import io.reactivex.functions.Function;
 
-import java.io.ByteArrayInputStream;
-import java.io.InputStream;
-
 /**
  * HTTP response which will buffer the response's body when/if it is read.
  */
@@ -60,9 +57,14 @@ public final class BufferedHttpResponse extends HttpResponse {
     }
 
     @Override
-    public Flowable<byte[]> streamBodyAsync() {
+    public Flowable<PooledBuffer> streamBodyAsync() {
         // FIXME: maybe need to enable streaming/collecting in here
-        return bodyAsByteArrayAsync().toFlowable();
+        return bodyAsByteArrayAsync().map(new Function<byte[], PooledBuffer>() {
+            @Override
+            public PooledBuffer apply(byte[] bytes) throws Exception {
+                return PooledBuffer.wrap(bytes);
+            }
+        }).toFlowable();
     }
 
     @Override

@@ -13,7 +13,6 @@ import io.reactivex.Flowable;
 import io.reactivex.FlowableSubscriber;
 import io.reactivex.Single;
 import io.reactivex.functions.Function;
-import io.reactivex.internal.functions.Functions;
 import org.reactivestreams.Subscription;
 
 import java.util.List;
@@ -82,11 +81,11 @@ class NettyResponse extends HttpResponse {
     }
 
     @Override
-    public Flowable<byte[]> streamBodyAsync() {
-        return contentStream.map(new Function<ByteBuf, byte[]>() {
+    public Flowable<PooledBuffer> streamBodyAsync() {
+        return contentStream.map(new Function<ByteBuf, PooledBuffer>() {
             @Override
-            public byte[] apply(ByteBuf byteBuf) {
-                return toByteArray(byteBuf);
+            public PooledBuffer apply(ByteBuf byteBuf) {
+                return new PooledBuffer(byteBuf);
             }
         });
     }

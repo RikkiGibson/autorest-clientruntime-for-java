@@ -8,6 +8,7 @@ package com.microsoft.azure.v2.http;
 
 import com.microsoft.rest.v2.http.HttpHeaders;
 import com.microsoft.rest.v2.http.HttpResponse;
+import com.microsoft.rest.v2.http.PooledBuffer;
 import com.microsoft.rest.v2.protocol.SerializerAdapter;
 import com.microsoft.rest.v2.serializer.JacksonAdapter;
 import io.reactivex.Flowable;
@@ -77,8 +78,8 @@ public class MockAzureHttpResponse extends HttpResponse {
     }
 
     @Override
-    public Flowable<byte[]> streamBodyAsync() {
-        return Flowable.just(bodyBytes);
+    public Flowable<PooledBuffer> streamBodyAsync() {
+        return Flowable.just(PooledBuffer.wrap(bodyBytes));
     }
 
     @Override

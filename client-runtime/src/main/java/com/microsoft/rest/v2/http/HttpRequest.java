@@ -21,7 +21,7 @@ public class HttpRequest {
     private URL url;
     private HttpResponseDecoder responseDecoder;
     private HttpHeaders headers;
-    private Flowable<byte[]> body;
+    private Flowable<PooledBuffer> body;
 
     /**
      * Create a new HttpRequest object with the provided HTTP method (GET, POST, PUT, etc.) and the
@@ -46,7 +46,7 @@ public class HttpRequest {
      * @param headers The HTTP headers to use with this request.
      * @param body The body of this HTTP request.
      */
-    public HttpRequest(String callerMethod, HttpMethod httpMethod, URL url, HttpHeaders headers, Flowable<byte[]> body) {
+    public HttpRequest(String callerMethod, HttpMethod httpMethod, URL url, HttpHeaders headers, Flowable<PooledBuffer> body) {
         this.callerMethod = callerMethod;
         this.httpMethod = httpMethod;
         this.url = url;
@@ -109,7 +109,7 @@ public class HttpRequest {
     }
 
     /**
-     * Get the {@link HttpResponseDecoder} which decodes messages sent in response to this HttpRequest
+     * Get the {@link HttpResponseDecoder} which decodes messages sent in response to this HttpRequest.
      * @return the response decoder
      */
     public HttpResponseDecoder responseDecoder() {
@@ -159,7 +159,7 @@ public class HttpRequest {
      * Get the body for this HttpRequest.
      * @return The body for this HttpRequest.
      */
-    public Flowable<byte[]> body() {
+    public Flowable<PooledBuffer> body() {
         return body;
     }
 
@@ -181,7 +181,7 @@ public class HttpRequest {
      */
     public HttpRequest withBody(byte[] body) {
         headers.set("Content-Length", String.valueOf(body.length));
-        return withBody(Flowable.just(body));
+        return withBody(Flowable.just(PooledBuffer.wrap(body)));
     }
 
     /**
@@ -191,7 +191,7 @@ public class HttpRequest {
      * @param body The body of this HTTP request.
      * @return This HttpRequest so that multiple operations can be chained together.
      */
-    public HttpRequest withBody(Flowable<byte[]> body) {
+    public HttpRequest withBody(Flowable<PooledBuffer> body) {
         this.body = body;
         return this;
     }

@@ -21,6 +21,7 @@ import com.microsoft.rest.v2.http.ContentType;
 import com.microsoft.rest.v2.http.HttpClient;
 import com.microsoft.rest.v2.http.HttpHeaders;
 import com.microsoft.rest.v2.http.HttpPipeline;
+import com.microsoft.rest.v2.http.PooledBuffer;
 import com.microsoft.rest.v2.policy.DecodingPolicyFactory;
 import com.microsoft.rest.v2.policy.HttpLogDetailLevel;
 import com.microsoft.rest.v2.policy.HttpLoggingPolicyFactory;
@@ -1297,7 +1298,7 @@ public abstract class RestProxyTests {
     @Host("http://httpbin.org")
     interface DownloadService {
         @GET("/bytes/30720")
-        RestResponse<Void, Flowable<byte[]>> getBytes();
+        RestResponse<Void, Flowable<PooledBuffer>> getBytes();
 
         @GET("/bytes/30720")
         Flowable<byte[]> getBytesFlowable();
@@ -1305,10 +1306,11 @@ public abstract class RestProxyTests {
 
     @Test
     public void SimpleDownloadTest() {
-        RestResponse<Void, Flowable<byte[]>> response = createService(DownloadService.class).getBytes();
+        RestResponse<Void, Flowable<PooledBuffer>> response = createService(DownloadService.class).getBytes();
         int count = 0;
-        for (byte[] bytes : response.body().blockingIterable()) {
-            count += bytes.length;
+        for (PooledBuffer pooledBuf : response.body().blockingIterable()) {
+            count += pooledBuf.byteBuffer().remaining();
+            pooledBuf.release();
         }
         assertEquals(30720, count);
     }
@@ -1326,13 +1328,13 @@ public abstract class RestProxyTests {
     @Host("http://httpbin.org")
     interface FlowableUploadService {
         @PUT("/put")
-        RestResponse<Void, HttpBinJSON> put(@BodyParam("text/plain") Flowable<byte[]> content, @HeaderParam("Content-Length") long contentLength);
+        RestResponse<Void, HttpBinJSON> put(@BodyParam("text/plain") Flowable<PooledBuffer> content, @HeaderParam("Content-Length") long contentLength);
     }
 
     @Test
     public void FlowableUploadTest() throws Exception {
         Path filePath = Paths.get(getClass().getClassLoader().getResource("upload.txt").toURI());
-        Flowable<byte[]> stream = FlowableUtil.readFile(AsynchronousFileChannel.open(filePath));
+        Flowable<PooledBuffer> stream = FlowableUtil.readFile(AsynchronousFileChannel.open(filePath));
 
         final HttpClient httpClient = createHttpClient();
         // Log the body so that body buffering/replay behavior is exercised.

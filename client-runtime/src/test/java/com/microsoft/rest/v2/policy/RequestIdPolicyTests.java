@@ -13,6 +13,7 @@ import com.microsoft.rest.v2.http.HttpPipelineBuilder;
 import com.microsoft.rest.v2.http.HttpRequest;
 import com.microsoft.rest.v2.http.HttpResponse;
 import com.microsoft.rest.v2.http.MockHttpClient;
+import com.microsoft.rest.v2.http.PooledBuffer;
 import io.reactivex.Flowable;
 import org.junit.Assert;
 import org.junit.Test;
@@ -45,8 +46,8 @@ public class RequestIdPolicyTests {
         }
 
         @Override
-        public Flowable<byte[]> streamBodyAsync() {
-            return Flowable.just(new byte[0]);
+        public Flowable<PooledBuffer> streamBodyAsync() {
+            return Flowable.just(PooledBuffer.wrap(new byte[0]));
         }
 
         @Override
