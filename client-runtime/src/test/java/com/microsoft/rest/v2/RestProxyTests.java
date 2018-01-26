@@ -35,6 +35,7 @@ import io.reactivex.Completable;
 import io.reactivex.Observable;
 import io.reactivex.Single;
 
+import java.nio.ByteBuffer;
 import java.nio.channels.AsynchronousFileChannel;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -1328,13 +1329,13 @@ public abstract class RestProxyTests {
     @Host("http://httpbin.org")
     interface FlowableUploadService {
         @PUT("/put")
-        RestResponse<Void, HttpBinJSON> put(@BodyParam("text/plain") Flowable<PooledBuffer> content, @HeaderParam("Content-Length") long contentLength);
+        RestResponse<Void, HttpBinJSON> put(@BodyParam("text/plain") Flowable<ByteBuffer> content, @HeaderParam("Content-Length") long contentLength);
     }
 
     @Test
     public void FlowableUploadTest() throws Exception {
         Path filePath = Paths.get(getClass().getClassLoader().getResource("upload.txt").toURI());
-        Flowable<PooledBuffer> stream = FlowableUtil.readFile(AsynchronousFileChannel.open(filePath));
+        Flowable<ByteBuffer> stream = FlowableUtil.readFile(AsynchronousFileChannel.open(filePath));
 
         final HttpClient httpClient = createHttpClient();
         // Log the body so that body buffering/replay behavior is exercised.

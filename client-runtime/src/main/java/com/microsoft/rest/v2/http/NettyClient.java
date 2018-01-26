@@ -8,6 +8,7 @@ package com.microsoft.rest.v2.http;
 
 import io.netty.bootstrap.Bootstrap;
 import io.netty.buffer.ByteBuf;
+import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
@@ -48,6 +49,7 @@ import java.net.InetSocketAddress;
 import java.net.Proxy;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.nio.ByteBuffer;
 import java.util.ArrayDeque;
 import java.util.Queue;
 import java.util.concurrent.TimeUnit;
@@ -281,9 +283,9 @@ public final class NettyClient extends HttpClient {
                                             }
                                         });
                             } else {
-                                Flowable<PooledBuffer> byteBufContent = request.body();
+                                Flowable<ByteBuffer> byteBufContent = request.body();
 
-                                byteBufContent.observeOn(Schedulers.from(channel.eventLoop())).subscribe(new FlowableSubscriber<PooledBuffer>() {
+                                byteBufContent.observeOn(Schedulers.from(channel.eventLoop())).subscribe(new FlowableSubscriber<ByteBuffer>() {
                                     Subscription subscription;
                                     @Override
                                     public void onSubscribe(Subscription s) {
@@ -300,21 +302,19 @@ public final class NettyClient extends HttpClient {
                                                         subscription.cancel();
                                                         channelPool.closeAndRelease(channel);
                                                         emitErrorIfSubscribed(future.cause());
+                                                    } else if (channel.isWritable()) {
+                                                        subscription.request(1);
                                                     }
                                                 }
                                             };
 
                                     @Override
-                                    public void onNext(PooledBuffer buf) {
+                                    public void onNext(ByteBuffer buf) {
                                         if (!channel.eventLoop().inEventLoop()) {
                                             throw new IllegalStateException("onNext must be called from the event loop managing the channel.");
                                         }
-                                        channel.writeAndFlush(new DefaultHttpContent(buf.byteBuf()))
+                                        channel.writeAndFlush(Unpooled.wrappedBuffer(buf))
                                                 .addListener(onChannelWriteComplete);
-
-                                        if (channel.isWritable()) {
-                                            subscription.request(1);
-                                        }
                                     }
 
                                     @Override

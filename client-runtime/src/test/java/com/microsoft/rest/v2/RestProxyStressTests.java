@@ -265,16 +265,18 @@ public class RestProxyStressTests {
                     @Override
                     public Completable apply(Integer id, final byte[] md5) throws Exception {
                         final AsynchronousFileChannel fileStream = AsynchronousFileChannel.open(TEMP_FOLDER_PATH.resolve("100m-" + id + ".dat"));
-                        Flowable<PooledBuffer> stream = FlowableUtil.readFile(fileStream);
-                        return service.upload100MB(String.valueOf(id), sas, "BlockBlob", stream, FILE_SIZE).flatMapCompletable(new Function<RestResponse<Void, Void>, CompletableSource>() {
-                            @Override
-                            public CompletableSource apply(RestResponse<Void, Void> response) throws Exception {
-                                String base64MD5 = response.rawHeaders().get("Content-MD5");
-                                byte[] receivedMD5 = BaseEncoding.base64().decode(base64MD5);
-                                assertArrayEquals(md5, receivedMD5);
-                                return Completable.complete();
-                            }
-                        });
+                        throw new Error();
+
+//                        Flowable<PooledBuffer> stream = FlowableUtil.readFile(fileStream);
+//                        return service.upload100MB(String.valueOf(id), sas, "BlockBlob", stream, FILE_SIZE).flatMapCompletable(new Function<RestResponse<Void, Void>, CompletableSource>() {
+//                            @Override
+//                            public CompletableSource apply(RestResponse<Void, Void> response) throws Exception {
+//                                String base64MD5 = response.rawHeaders().get("Content-MD5");
+//                                byte[] receivedMD5 = BaseEncoding.base64().decode(base64MD5);
+//                                assertArrayEquals(md5, receivedMD5);
+//                                return Completable.complete();
+//                            }
+//                        });
                     }
                 }).flatMapCompletable(Functions.<Completable>identity(), false, 30).blockingAwait();
         String timeTakenString = PeriodFormat.getDefault().print(new Duration(start, Instant.now()).toPeriod());

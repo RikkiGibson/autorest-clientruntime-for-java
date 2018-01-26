@@ -10,6 +10,7 @@ import com.microsoft.rest.v2.protocol.HttpResponseDecoder;
 import io.reactivex.Flowable;
 
 import java.net.URL;
+import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 
 /**
@@ -21,7 +22,7 @@ public class HttpRequest {
     private URL url;
     private HttpResponseDecoder responseDecoder;
     private HttpHeaders headers;
-    private Flowable<PooledBuffer> body;
+    private Flowable<ByteBuffer> body;
 
     /**
      * Create a new HttpRequest object with the provided HTTP method (GET, POST, PUT, etc.) and the
@@ -46,7 +47,7 @@ public class HttpRequest {
      * @param headers The HTTP headers to use with this request.
      * @param body The body of this HTTP request.
      */
-    public HttpRequest(String callerMethod, HttpMethod httpMethod, URL url, HttpHeaders headers, Flowable<PooledBuffer> body) {
+    public HttpRequest(String callerMethod, HttpMethod httpMethod, URL url, HttpHeaders headers, Flowable<ByteBuffer> body) {
         this.callerMethod = callerMethod;
         this.httpMethod = httpMethod;
         this.url = url;
@@ -159,7 +160,7 @@ public class HttpRequest {
      * Get the body for this HttpRequest.
      * @return The body for this HttpRequest.
      */
-    public Flowable<PooledBuffer> body() {
+    public Flowable<ByteBuffer> body() {
         return body;
     }
 
@@ -181,7 +182,7 @@ public class HttpRequest {
      */
     public HttpRequest withBody(byte[] body) {
         headers.set("Content-Length", String.valueOf(body.length));
-        return withBody(Flowable.just(PooledBuffer.wrap(body)));
+        return withBody(Flowable.just(ByteBuffer.wrap(body)));
     }
 
     /**
@@ -191,7 +192,7 @@ public class HttpRequest {
      * @param body The body of this HTTP request.
      * @return This HttpRequest so that multiple operations can be chained together.
      */
-    public HttpRequest withBody(Flowable<PooledBuffer> body) {
+    public HttpRequest withBody(Flowable<ByteBuffer> body) {
         this.body = body;
         return this;
     }
