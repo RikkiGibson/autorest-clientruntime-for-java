@@ -6,8 +6,6 @@
 
 package com.microsoft.rest.v2.util;
 
-import com.google.common.io.ByteArrayDataOutput;
-import com.google.common.io.ByteStreams;
 import com.google.common.reflect.TypeToken;
 import com.microsoft.rest.v2.http.PooledBuffer;
 import io.reactivex.Completable;
@@ -16,8 +14,6 @@ import io.reactivex.CompletableOnSubscribe;
 import io.reactivex.Flowable;
 import io.reactivex.FlowableSubscriber;
 import io.reactivex.Single;
-import io.reactivex.functions.BiConsumer;
-import io.reactivex.functions.Function;
 import io.reactivex.internal.util.BackpressureHelper;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
