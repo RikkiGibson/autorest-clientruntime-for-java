@@ -25,6 +25,7 @@ import org.reactivestreams.Subscription;
 import java.io.IOException;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
+import java.nio.ByteBuffer;
 import java.nio.channels.AsynchronousFileChannel;
 import java.nio.channels.CompletionHandler;
 import java.util.concurrent.atomic.AtomicLong;
@@ -209,15 +210,22 @@ public class FlowableUtil {
                 }
             }
 
-            void doRead() {
-                // FIXME check if smaller buf can be allocated?
-                PooledBuffer buf = PooledBuffer.allocate(CHUNK_SIZE);
-                fileChannel.read(buf.byteBuffer(), position, buf, onReadComplete);
+            class ReadContext {
+                PooledBuffer pooled;
+                ByteBuffer view;
             }
 
-            private final CompletionHandler<Integer, PooledBuffer> onReadComplete = new CompletionHandler<Integer, PooledBuffer>() {
+            void doRead() {
+                PooledBuffer buf = PooledBuffer.allocate(CHUNK_SIZE);
+                ReadContext ctx = new ReadContext();
+                ctx.pooled = buf;
+                ctx.view = buf.byteBuffer();
+                fileChannel.read(ctx.view, position, ctx, onReadComplete);
+            }
+
+            private final CompletionHandler<Integer, ReadContext> onReadComplete = new CompletionHandler<Integer, ReadContext>() {
                 @Override
-                public void completed(Integer bytesRead, PooledBuffer attachment) {
+                public void completed(Integer bytesRead, ReadContext attachment) {
                     if (!cancelled) {
                         if (bytesRead == -1) {
                             subscriber.onComplete();
@@ -225,8 +233,8 @@ public class FlowableUtil {
                             int bytesWanted = (int) Math.min(bytesRead, offset + length - position);
                             //noinspection NonAtomicOperationOnVolatileField
                             position += bytesWanted;
-                            // TODO: set capacity of ByteBuf
-                            subscriber.onNext(attachment);
+                            attachment.pooled.sync(attachment.view);
+                            subscriber.onNext(attachment.pooled);
                             if (position >= offset + length) {
                                 subscriber.onComplete();
                             } else if (requested.decrementAndGet() > 0) {
@@ -237,9 +245,9 @@ public class FlowableUtil {
                 }
 
                 @Override
-                public void failed(Throwable exc, PooledBuffer attachment) {
+                public void failed(Throwable exc, ReadContext attachment) {
                     if (!cancelled) {
-                        attachment.release();
+                        attachment.pooled.release();
                         subscriber.onError(exc);
                     }
                 }

@@ -26,8 +26,7 @@ public class PooledBuffer {
      * @return the pooled buffer.
      */
     public static PooledBuffer allocate(int size) {
-        ByteBuf byteBuf = ByteBufAllocator.DEFAULT.ioBuffer(size, size);
-        byteBuf.writerIndex(byteBuf.readerIndex() + size); // why does this fix it?
+        ByteBuf byteBuf = ByteBufAllocator.DEFAULT.ioBuffer(size);
         return new PooledBuffer(byteBuf);
     }
 
@@ -57,19 +56,27 @@ public class PooledBuffer {
     }
 
     /**
-     * @return the ByteBuffer contained in this PooledBuffer.
+     * Returns a ByteBuffer which provides a view into the same memory as this PooledBuffer.
+     * Modifications to the returned ByteBuffer require calling sync(ByteBuffer) to make the PooledBuffer aware of the recently read or written content.
+     *
+     * @return a view of the PooledBuffer's memory.
      */
     public ByteBuffer byteBuffer() {
-        if (byteBuf.hasArray()) {
-            return ByteBuffer.wrap(byteBuf.array());
-        } else {
-            // Is this ok..?
-            return byteBuf.internalNioBuffer(byteBuf.readerIndex(), byteBuf.readableBytes());
-        }
+        ByteBuffer nioBuffer = byteBuf.nioBuffer(byteBuf.readerIndex(), byteBuf.capacity());
+        return nioBuffer;
     }
 
     /**
-     * Release the ByteBuffer contained in this PooledBuffer.
+     * Synchronizes the read and write positions of this PooledBuffer with a {@link ByteBuffer} that references the same underlying memory.
+     *
+     * @param view the byte buffer
+     */
+    public void sync(ByteBuffer view) {
+        byteBuf.writerIndex(view.position());
+    }
+
+    /**
+     * Releases the memory contained in this PooledBuffer.
      */
     public void release() {
         byteBuf.release();
