@@ -8,7 +8,6 @@ package com.microsoft.rest.v2.http;
 
 import io.netty.bootstrap.Bootstrap;
 import io.netty.buffer.ByteBuf;
-import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
@@ -20,6 +19,7 @@ import io.netty.channel.pool.AbstractChannelPoolHandler;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.handler.codec.EncoderException;
+import io.netty.handler.codec.http.DefaultHttpContent;
 import io.netty.handler.codec.http.DefaultHttpRequest;
 import io.netty.handler.codec.http.DefaultLastHttpContent;
 import io.netty.handler.codec.http.HttpClientCodec;
@@ -48,7 +48,6 @@ import java.net.InetSocketAddress;
 import java.net.Proxy;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.nio.ByteBuffer;
 import java.util.ArrayDeque;
 import java.util.Queue;
 import java.util.concurrent.TimeUnit;
@@ -282,9 +281,9 @@ public final class NettyClient extends HttpClient {
                                             }
                                         });
                             } else {
-                                Flowable<ByteBuffer> byteBufContent = request.body();
+                                Flowable<PooledBuffer> byteBufContent = request.body();
 
-                                byteBufContent.observeOn(Schedulers.from(channel.eventLoop())).subscribe(new FlowableSubscriber<ByteBuffer>() {
+                                byteBufContent.observeOn(Schedulers.from(channel.eventLoop())).subscribe(new FlowableSubscriber<PooledBuffer>() {
                                     Subscription subscription;
                                     @Override
                                     public void onSubscribe(Subscription s) {
@@ -301,19 +300,21 @@ public final class NettyClient extends HttpClient {
                                                         subscription.cancel();
                                                         channelPool.closeAndRelease(channel);
                                                         emitErrorIfSubscribed(future.cause());
-                                                    } else if (channel.isWritable()) {
-                                                        subscription.request(1);
                                                     }
                                                 }
                                             };
 
                                     @Override
-                                    public void onNext(ByteBuffer buf) {
+                                    public void onNext(PooledBuffer buf) {
                                         if (!channel.eventLoop().inEventLoop()) {
                                             throw new IllegalStateException("onNext must be called from the event loop managing the channel.");
                                         }
-                                        channel.writeAndFlush(Unpooled.wrappedBuffer(buf))
+                                        channel.writeAndFlush(new DefaultHttpContent(buf.byteBuf()))
                                                 .addListener(onChannelWriteComplete);
+
+                                        if (channel.isWritable()) {
+                                            subscription.request(1);
+                                        }
                                     }
 
                                     @Override

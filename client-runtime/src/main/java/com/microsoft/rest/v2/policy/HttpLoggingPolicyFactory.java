@@ -12,6 +12,7 @@ import com.microsoft.rest.v2.http.HttpHeader;
 import com.microsoft.rest.v2.http.HttpHeaders;
 import com.microsoft.rest.v2.http.HttpRequest;
 import com.microsoft.rest.v2.http.HttpResponse;
+import com.microsoft.rest.v2.util.FlowableUtil;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.reactivex.Completable;
 import io.reactivex.CompletableSource;
@@ -115,7 +116,7 @@ public class HttpLoggingPolicyFactory implements RequestPolicyFactory {
 
                     if (contentLength < MAX_BODY_LOG_SIZE && isHumanReadableContentType) {
                         try {
-                            Single<byte[]> collectedBytes = Single.just(new byte[0]); //FlowableUtil.collectBytes(request.body());
+                            Single<byte[]> collectedBytes = FlowableUtil.collectBytes(request.body());
                             bodyLoggingTask = collectedBytes.flatMapCompletable(new Function<byte[], CompletableSource>() {
                                 @Override
                                 public CompletableSource apply(byte[] bytes) throws Exception {

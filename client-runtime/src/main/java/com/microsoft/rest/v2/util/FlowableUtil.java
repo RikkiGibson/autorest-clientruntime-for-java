@@ -6,6 +6,8 @@
 
 package com.microsoft.rest.v2.util;
 
+import com.google.common.io.ByteArrayDataOutput;
+import com.google.common.io.ByteStreams;
 import com.google.common.reflect.TypeToken;
 import com.microsoft.rest.v2.http.PooledBuffer;
 import io.reactivex.Completable;
@@ -14,6 +16,8 @@ import io.reactivex.CompletableOnSubscribe;
 import io.reactivex.Flowable;
 import io.reactivex.FlowableSubscriber;
 import io.reactivex.Single;
+import io.reactivex.functions.BiConsumer;
+import io.reactivex.functions.Function;
 import io.reactivex.internal.util.BackpressureHelper;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
@@ -31,12 +35,12 @@ import java.util.concurrent.atomic.AtomicLong;
  */
 public class FlowableUtil {
     /**
-     * Checks if a type is Flowable&lt;PooledBuffer&gt;.
+     * Checks if a type is Flowable&lt;byte[]&gt;.
      *
      * @param entityTypeToken the type to check
      * @return whether the type represents a Flowable that emits byte arrays
      */
-    public static boolean isFlowablePooledBuffer(TypeToken entityTypeToken) {
+    public static boolean isFlowableByteArray(TypeToken entityTypeToken) {
         if (entityTypeToken.isSubtypeOf(Flowable.class)) {
             final Type innerType = ((ParameterizedType) entityTypeToken.getType()).getActualTypeArguments()[0];
             final TypeToken innerTypeToken = TypeToken.of(innerType);
@@ -48,49 +52,30 @@ public class FlowableUtil {
     }
 
     /**
-     * Checks if a type is Flowable&lt;ByteBuffer&gt;.
-     *
-     * @param entityTypeToken the type to check
-     * @return whether the type represents a Flowable that emits byte arrays
-     */
-    public static boolean isFlowableByteBuffer(TypeToken entityTypeToken) {
-        if (entityTypeToken.isSubtypeOf(Flowable.class)) {
-            final Type innerType = ((ParameterizedType) entityTypeToken.getType()).getActualTypeArguments()[0];
-            final TypeToken innerTypeToken = TypeToken.of(innerType);
-            if (innerTypeToken.isSubtypeOf(ByteBuffer.class)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    /**
      * Collects pooled buffers emitted by a Flowable into a Single. Does not free the buffers.
      * @param content A stream which emits byte arrays.
      * @return A Single which emits the concatenation of all the byte arrays given by the source Flowable.
      */
-    public static Single<byte[]> collectBytes(Flowable<ByteBuffer> content) {
-        throw new Error();
-
-//        return content.collectInto(ByteStreams.newDataOutput(), new BiConsumer<ByteArrayDataOutput, PooledBuffer>() {
-//            @Override
-//            public void accept(ByteArrayDataOutput out, PooledBuffer chunk) throws Exception {
-//                // FIXME reduce copying
-//                byte[] arrayChunk;
-//                if (chunk.byteBuffer().hasArray()) {
-//                    arrayChunk = chunk.byteBuffer().array();
-//                } else {
-//                    arrayChunk = new byte[chunk.byteBuffer().position()];
-//                    chunk.byteBuffer().get(arrayChunk);
-//                }
-//                out.write(arrayChunk);
-//            }
-//        }).map(new Function<ByteArrayDataOutput, byte[]>() {
-//            @Override
-//            public byte[] apply(ByteArrayDataOutput out) throws Exception {
-//                return out.toByteArray();
-//            }
-//        });
+    public static Single<byte[]> collectBytes(Flowable<PooledBuffer> content) {
+        return content.collectInto(ByteStreams.newDataOutput(), new BiConsumer<ByteArrayDataOutput, PooledBuffer>() {
+            @Override
+            public void accept(ByteArrayDataOutput out, PooledBuffer chunk) throws Exception {
+                // FIXME reduce copying
+                byte[] arrayChunk;
+                if (chunk.byteBuffer().hasArray()) {
+                    arrayChunk = chunk.byteBuffer().array();
+                } else {
+                    arrayChunk = new byte[chunk.byteBuffer().position()];
+                    chunk.byteBuffer().get(arrayChunk);
+                }
+                out.write(arrayChunk);
+            }
+        }).map(new Function<ByteArrayDataOutput, byte[]>() {
+            @Override
+            public byte[] apply(ByteArrayDataOutput out) throws Exception {
+                return out.toByteArray();
+            }
+        });
     }
 
     /**
@@ -166,15 +151,15 @@ public class FlowableUtil {
     }
 
     /**
-     * Creates a Flowable emitting ByteBuffer from an AsynchronousFileChannel.
+     * Creates an AsyncInputStream from an AsynchronousFileChannel.
      *
      * @param fileChannel The file channel.
      * @param offset The offset in the file to begin reading.
      * @param length The number of bytes of data to read from the file.
      * @return The AsyncInputStream.
      */
-    public static Flowable<ByteBuffer> readFile(final AsynchronousFileChannel fileChannel, final long offset, final long length) {
-        Flowable<ByteBuffer> fileStream = new FileReadFlowable(fileChannel, offset, length);
+    public static Flowable<PooledBuffer> readFile(final AsynchronousFileChannel fileChannel, final long offset, final long length) {
+        Flowable<PooledBuffer> fileStream = new FileReadFlowable(fileChannel, offset, length);
         return fileStream;
     }
 
@@ -184,17 +169,16 @@ public class FlowableUtil {
      * @throws IOException if an error occurs when determining file size
      * @return The AsyncInputStream.
      */
-    public static Flowable<ByteBuffer> readFile(AsynchronousFileChannel fileChannel) throws IOException {
+    public static Flowable<PooledBuffer> readFile(AsynchronousFileChannel fileChannel) throws IOException {
         long size = fileChannel.size();
         return readFile(fileChannel, 0, size);
     }
 
     private static final int CHUNK_SIZE = 8192;
-    private static class FileReadFlowable extends Flowable<ByteBuffer> {
+    private static class FileReadFlowable extends Flowable<PooledBuffer> {
         private final AsynchronousFileChannel fileChannel;
         private final long offset;
         private final long length;
-        private final ByteBuffer dst = ByteBuffer.allocateDirect(CHUNK_SIZE);
 
         FileReadFlowable(AsynchronousFileChannel fileChannel, long offset, long length) {
             this.fileChannel = fileChannel;
@@ -203,19 +187,19 @@ public class FlowableUtil {
         }
 
         @Override
-        protected void subscribeActual(Subscriber<? super ByteBuffer> s) {
+        protected void subscribeActual(Subscriber<? super PooledBuffer> s) {
             s.onSubscribe(new FileReadSubscription(s));
         }
 
         private class FileReadSubscription implements Subscription {
-            final Subscriber<? super ByteBuffer> subscriber;
+            final Subscriber<? super PooledBuffer> subscriber;
             final AtomicLong requested = new AtomicLong();
             volatile boolean cancelled = false;
 
             // I/O callbacks are serialized, but not guaranteed to happen on the same thread, which makes volatile necessary.
             volatile long position = offset;
 
-            FileReadSubscription(Subscriber<? super ByteBuffer> subscriber) {
+            FileReadSubscription(Subscriber<? super PooledBuffer> subscriber) {
                 this.subscriber = subscriber;
             }
 
@@ -226,14 +210,22 @@ public class FlowableUtil {
                 }
             }
 
-            void doRead() {
-                dst.clear();
-                fileChannel.read(dst, position, null, onReadComplete);
+            class ReadContext {
+                PooledBuffer pooled;
+                ByteBuffer view;
             }
 
-            private final CompletionHandler<Integer, Object> onReadComplete = new CompletionHandler<Integer, Object>() {
+            void doRead() {
+                PooledBuffer buf = PooledBuffer.allocate(CHUNK_SIZE);
+                ReadContext ctx = new ReadContext();
+                ctx.pooled = buf;
+                ctx.view = buf.byteBuffer();
+                fileChannel.read(ctx.view, position, ctx, onReadComplete);
+            }
+
+            private final CompletionHandler<Integer, ReadContext> onReadComplete = new CompletionHandler<Integer, ReadContext>() {
                 @Override
-                public void completed(Integer bytesRead, Object attachment) {
+                public void completed(Integer bytesRead, ReadContext attachment) {
                     if (!cancelled) {
                         if (bytesRead == -1) {
                             subscriber.onComplete();
@@ -241,9 +233,8 @@ public class FlowableUtil {
                             int bytesWanted = (int) Math.min(bytesRead, offset + length - position);
                             //noinspection NonAtomicOperationOnVolatileField
                             position += bytesWanted;
-
-                            dst.flip();
-                            subscriber.onNext(dst);
+                            attachment.pooled.sync(attachment.view);
+                            subscriber.onNext(attachment.pooled);
                             if (position >= offset + length) {
                                 subscriber.onComplete();
                             } else if (requested.decrementAndGet() > 0) {
@@ -254,8 +245,9 @@ public class FlowableUtil {
                 }
 
                 @Override
-                public void failed(Throwable exc, Object attachment) {
+                public void failed(Throwable exc, ReadContext attachment) {
                     if (!cancelled) {
+                        attachment.pooled.release();
                         subscriber.onError(exc);
                     }
                 }

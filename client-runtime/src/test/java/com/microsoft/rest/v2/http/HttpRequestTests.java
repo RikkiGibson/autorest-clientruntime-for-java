@@ -6,7 +6,6 @@ import org.junit.Test;
 import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URL;
-import java.nio.ByteBuffer;
 
 import static org.junit.Assert.*;
 
@@ -30,7 +29,7 @@ public class HttpRequestTests {
                 HttpMethod.fromString("request http method"),
                 new URL("http://request.url"),
                 headers,
-                Flowable.just(ByteBuffer.wrap(new byte[0])));
+                Flowable.just(PooledBuffer.wrap(new byte[0])));
 
         final HttpRequest bufferedRequest = request.buffer();
 

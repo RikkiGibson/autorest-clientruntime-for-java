@@ -66,7 +66,7 @@ public final class HttpResponseDecoder {
 
         final TypeToken entityTypeToken = getEntityType();
 
-        boolean isSerializableBody = !FlowableUtil.isFlowablePooledBuffer(entityTypeToken)
+        boolean isSerializableBody = !FlowableUtil.isFlowableByteArray(entityTypeToken)
             && !entityTypeToken.isSubtypeOf(Completable.class)
             && !entityTypeToken.isSubtypeOf(byte[].class)
             && !entityTypeToken.isSubtypeOf(boolean.class) && !entityTypeToken.isSubtypeOf(Boolean.class)
