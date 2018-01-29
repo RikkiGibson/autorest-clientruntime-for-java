@@ -25,7 +25,6 @@ import org.reactivestreams.Subscription;
 import java.io.IOException;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
-import java.nio.ByteBuffer;
 import java.nio.channels.AsynchronousFileChannel;
 import java.nio.channels.CompletionHandler;
 import java.util.concurrent.atomic.AtomicLong;
@@ -210,22 +209,14 @@ public class FlowableUtil {
                 }
             }
 
-            class ReadContext {
-                PooledBuffer pooled;
-                ByteBuffer view;
-            }
-
             void doRead() {
                 PooledBuffer buf = PooledBuffer.allocate(CHUNK_SIZE);
-                ReadContext ctx = new ReadContext();
-                ctx.pooled = buf;
-                ctx.view = buf.byteBuffer();
-                fileChannel.read(ctx.view, position, ctx, onReadComplete);
+                fileChannel.read(buf.byteBuffer(), position, buf, onReadComplete);
             }
 
-            private final CompletionHandler<Integer, ReadContext> onReadComplete = new CompletionHandler<Integer, ReadContext>() {
+            private final CompletionHandler<Integer, PooledBuffer> onReadComplete = new CompletionHandler<Integer, PooledBuffer>() {
                 @Override
-                public void completed(Integer bytesRead, ReadContext attachment) {
+                public void completed(Integer bytesRead, PooledBuffer attachment) {
                     if (!cancelled) {
                         if (bytesRead == -1) {
                             subscriber.onComplete();
@@ -233,8 +224,8 @@ public class FlowableUtil {
                             int bytesWanted = (int) Math.min(bytesRead, offset + length - position);
                             //noinspection NonAtomicOperationOnVolatileField
                             position += bytesWanted;
-                            attachment.pooled.sync(attachment.view);
-                            subscriber.onNext(attachment.pooled);
+                            attachment.syncRead();
+                            subscriber.onNext(attachment);
                             if (position >= offset + length) {
                                 subscriber.onComplete();
                             } else if (requested.decrementAndGet() > 0) {
@@ -245,9 +236,9 @@ public class FlowableUtil {
                 }
 
                 @Override
-                public void failed(Throwable exc, ReadContext attachment) {
+                public void failed(Throwable exc, PooledBuffer attachment) {
                     if (!cancelled) {
-                        attachment.pooled.release();
+                        attachment.release();
                         subscriber.onError(exc);
                     }
                 }

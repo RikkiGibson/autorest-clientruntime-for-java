@@ -20,6 +20,8 @@ public class PooledBuffer {
         System.setProperty("io.netty.leakDetection.acquireAndReleaseOnly", "true");
     }
 
+    private final ByteBuffer nioBuffer;
+
     /**
      * Allocates a pooled buffer of a given size.
      * @param size the size of buffer to allocate.
@@ -53,6 +55,7 @@ public class PooledBuffer {
 
     PooledBuffer(ByteBuf byteBuf) {
         this.byteBuf = byteBuf;
+        this.nioBuffer = byteBuf.nioBuffer(byteBuf.readerIndex(), byteBuf.capacity());
     }
 
     /**
@@ -62,17 +65,14 @@ public class PooledBuffer {
      * @return a view of the PooledBuffer's memory.
      */
     public ByteBuffer byteBuffer() {
-        ByteBuffer nioBuffer = byteBuf.nioBuffer(byteBuf.readerIndex(), byteBuf.capacity());
         return nioBuffer;
     }
 
     /**
-     * Synchronizes the read and write positions of this PooledBuffer with a {@link ByteBuffer} that references the same underlying memory.
-     *
-     * @param view the byte buffer
+     * Synchronizes the read position of this PooledBuffer with the underlying NIO buffer.
      */
-    public void sync(ByteBuffer view) {
-        byteBuf.writerIndex(view.position());
+    public void syncRead() {
+        byteBuf.writerIndex(nioBuffer.position());
     }
 
     /**

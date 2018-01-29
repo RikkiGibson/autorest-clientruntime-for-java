@@ -19,7 +19,6 @@ import io.netty.channel.pool.AbstractChannelPoolHandler;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.handler.codec.EncoderException;
-import io.netty.handler.codec.http.DefaultHttpContent;
 import io.netty.handler.codec.http.DefaultHttpRequest;
 import io.netty.handler.codec.http.DefaultLastHttpContent;
 import io.netty.handler.codec.http.HttpClientCodec;
@@ -309,7 +308,7 @@ public final class NettyClient extends HttpClient {
                                         if (!channel.eventLoop().inEventLoop()) {
                                             throw new IllegalStateException("onNext must be called from the event loop managing the channel.");
                                         }
-                                        channel.writeAndFlush(new DefaultHttpContent(buf.byteBuf()))
+                                        channel.writeAndFlush(buf.byteBuf())
                                                 .addListener(onChannelWriteComplete);
 
                                         if (channel.isWritable()) {
