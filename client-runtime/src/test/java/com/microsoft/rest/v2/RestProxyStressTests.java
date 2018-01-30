@@ -33,6 +33,7 @@ import io.reactivex.Emitter;
 import io.reactivex.Flowable;
 import io.reactivex.Single;
 import io.reactivex.SingleSource;
+import io.reactivex.disposables.Disposable;
 import io.reactivex.functions.Action;
 import io.reactivex.functions.BiConsumer;
 import io.reactivex.functions.BiFunction;
@@ -441,7 +442,7 @@ public class RestProxyStressTests {
     }
 
     @Test
-    public void cancellationTest() {
+    public void cancellationTest() throws Exception {
         final String sas = System.getenv("JAVA_SDK_TEST_SAS");
         HttpHeaders headers = new HttpHeaders()
                 .set("x-ms-version", "2017-04-17");
@@ -454,17 +455,34 @@ public class RestProxyStressTests {
 
         final IOService service = RestProxy.create(IOService.class, pipeline);
 
-        Flowable.range(0, NUM_FILES)
-                .flatMap(new Function<Integer, Publisher<?>>() {
+        final Disposable d = Flowable.range(0, NUM_FILES)
+                .flatMap(new Function<Integer, Publisher<PooledBuffer>>() {
                     @Override
-                    public Publisher<?> apply(Integer integer) throws Exception {
-                        return service.download100M(String.valueOf(integer), sas).flatMapPublisher(new Function<RestResponse<Void, Flowable<PooledBuffer>>, Publisher<?>>() {
+                    public Publisher<PooledBuffer> apply(Integer integer) throws Exception {
+                        return service.download100M(String.valueOf(integer), sas).flatMapPublisher(new Function<RestResponse<Void, Flowable<PooledBuffer>>, Publisher<PooledBuffer>>() {
                             @Override
-                            public Publisher<?> apply(RestResponse<Void, Flowable<PooledBuffer>> response) throws Exception {
-                                return response.body().timeout(100, TimeUnit.MILLISECONDS);
+                            public Publisher<PooledBuffer> apply(RestResponse<Void, Flowable<PooledBuffer>> response) throws Exception {
+                                return response.body();
                             }
                         });
                     }
-                }).blockingLast();
+                }).flatMapCompletable(new Function<PooledBuffer, CompletableSource>() {
+                    @Override
+                    public CompletableSource apply(PooledBuffer pooledBuffer) throws Exception {
+                        pooledBuffer.release();
+                        return Completable.complete();
+                    }
+                }).subscribe();
+
+        Completable.complete().delay(10, TimeUnit.SECONDS)
+                .andThen(Completable.defer(new Callable<CompletableSource>() {
+                    @Override
+                    public CompletableSource call() throws Exception {
+                        d.dispose();
+                        return Completable.complete();
+                    }
+                })).blockingAwait();
+
+        System.in.read();
     }
 }

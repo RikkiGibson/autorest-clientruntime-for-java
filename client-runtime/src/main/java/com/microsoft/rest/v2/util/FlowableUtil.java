@@ -224,7 +224,6 @@ public class FlowableUtil {
                             int bytesWanted = (int) Math.min(bytesRead, offset + length - position);
                             //noinspection NonAtomicOperationOnVolatileField
                             position += bytesWanted;
-                            attachment.syncRead();
                             subscriber.onNext(attachment);
                             if (position >= offset + length) {
                                 subscriber.onComplete();

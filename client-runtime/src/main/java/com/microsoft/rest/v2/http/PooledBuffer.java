@@ -60,19 +60,11 @@ public class PooledBuffer {
 
     /**
      * Returns a ByteBuffer which provides a view into the same memory as this PooledBuffer.
-     * Modifications to the returned ByteBuffer require calling sync(ByteBuffer) to make the PooledBuffer aware of the recently read or written content.
      *
      * @return a view of the PooledBuffer's memory.
      */
     public ByteBuffer byteBuffer() {
         return nioBuffer;
-    }
-
-    /**
-     * Synchronizes the read position of this PooledBuffer with the underlying NIO buffer.
-     */
-    public void syncRead() {
-        byteBuf.writerIndex(nioBuffer.position());
     }
 
     /**
@@ -86,6 +78,6 @@ public class PooledBuffer {
      * Internal use only for giving to Netty.
      */
     ByteBuf byteBuf() {
-        return byteBuf;
+        return byteBuf.writerIndex(nioBuffer.position());
     }
 }
