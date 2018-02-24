@@ -14,5 +14,5 @@ public class Slideshow {
     public String author;
 
     @JsonProperty("slide")
-    public Slide[] slides;
+    public Slide[] slides = new Slide[0];
 }

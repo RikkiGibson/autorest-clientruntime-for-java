@@ -11,5 +11,5 @@ public class Slide {
     public String title;
 
     @JsonProperty("item")
-    public String[] items;
+    public String[] items = new String[0];
 }

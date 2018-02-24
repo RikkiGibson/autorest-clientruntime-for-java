@@ -7,7 +7,6 @@
 package com.microsoft.rest.v2.serializer;
 
 import com.fasterxml.jackson.annotation.JsonAutoDetect;
-import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -154,7 +153,6 @@ public class JacksonAdapter implements SerializerAdapter<ObjectMapper> {
                 .configure(DeserializationFeature.ACCEPT_EMPTY_STRING_AS_NULL_OBJECT, true)
                 .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
                 .configure(DeserializationFeature.ACCEPT_SINGLE_VALUE_AS_ARRAY, true)
-                .setSerializationInclusion(JsonInclude.Include.NON_NULL)
                 .registerModule(new JodaModule())
                 .registerModule(ByteArraySerializer.getModule())
                 .registerModule(Base64UrlSerializer.getModule())

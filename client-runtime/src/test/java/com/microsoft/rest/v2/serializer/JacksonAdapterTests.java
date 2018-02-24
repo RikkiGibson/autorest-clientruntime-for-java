@@ -26,9 +26,11 @@ public class JacksonAdapterTests {
             serializer.serialize(map);
             fail();
         }
-        catch (Exception e) {
-            assertEquals(JsonMappingException.class, e.getClass());
+        catch (JsonMappingException e) {
             assertTrue(e.getMessage().contains("Null key for a Map not allowed in JSON"));
+        }
+        catch (Exception e) {
+            fail(e.getMessage());
         }
     }
 
