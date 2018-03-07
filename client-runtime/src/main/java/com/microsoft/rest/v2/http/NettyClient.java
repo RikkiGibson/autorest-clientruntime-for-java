@@ -7,7 +7,6 @@
 package com.microsoft.rest.v2.http;
 
 import io.netty.bootstrap.Bootstrap;
-import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
@@ -34,7 +33,6 @@ import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.GenericFutureListener;
 import io.reactivex.Flowable;
 import io.reactivex.FlowableSubscriber;
-import io.reactivex.Scheduler;
 import io.reactivex.Single;
 import io.reactivex.SingleEmitter;
 import io.reactivex.disposables.Disposable;
@@ -355,13 +353,13 @@ public final class NettyClient extends HttpClient {
     /**
      * Emits HTTP response content from Netty.
      */
-    private static final class ResponseContentFlowable extends Flowable<ByteBuf> implements Subscription {
+    private static final class ResponseContentFlowable extends Flowable<ByteBuffer> implements Subscription {
         final EventLoop currentEventLoop;
         final Queue<HttpContent> queuedContent = new ArrayDeque<>();
         final Subscription handlerSubscription;
         boolean draining = false;
         long chunksRequested = 0;
-        Subscriber<? super ByteBuf> subscriber;
+        Subscriber<? super ByteBuffer> subscriber;
 
         // Cancellation is triggered by a non-observing thread.
         volatile boolean isCanceled = false;
@@ -376,7 +374,7 @@ public final class NettyClient extends HttpClient {
         }
 
         @Override
-        protected void subscribeActual(Subscriber<? super ByteBuf> s) {
+        protected void subscribeActual(Subscriber<? super ByteBuffer> s) {
             if (subscriber == null) {
                 subscriber = s;
                 subscriber.onSubscribe(this);
@@ -433,7 +431,11 @@ public final class NettyClient extends HttpClient {
         }
 
         private void emitContent(HttpContent data) {
-            subscriber.onNext(data.content());
+            ByteBuffer dst = ByteBuffer.allocate(data.content().readableBytes());
+            data.content().readBytes(dst);
+            data.release();
+            dst.flip();
+            subscriber.onNext(dst);
             if (data instanceof LastHttpContent) {
                 subscriber.onComplete();
             }
@@ -519,8 +521,6 @@ public final class NettyClient extends HttpClient {
 
                 // Prevents channel from being closed when the Single<HttpResponse> is disposed
                 didEmitHttpResponse = true;
-
-                Scheduler scheduler = Schedulers.from(ctx.channel().eventLoop());
                 responseEmitter.onSuccess(new NettyResponse(response, contentEmitter));
             }
 
