@@ -421,12 +421,12 @@ public final class NettyClient extends HttpClient {
         @Override
         public void cancel() {
             isCanceled = true;
-            handlerSubscription.cancel();
 
             currentEventLoop.execute(() -> {
                 while (!queuedContent.isEmpty()) {
                     queuedContent.remove().release();
                 }
+                handlerSubscription.cancel();
             });
         }
 
