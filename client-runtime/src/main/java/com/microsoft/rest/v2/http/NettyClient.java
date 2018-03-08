@@ -405,7 +405,7 @@ public final class NettyClient extends HttpClient {
                     try {
                         draining = true;
                         while (!queuedContent.isEmpty() && chunksRequested > 0 && !isCanceled) {
-                            emitContent(queuedContent.remove());
+                            emitContent(queuedContent.remove().touch("Draining from queue"));
                         }
 
                         if (chunksRequested > 0 && !isCanceled) {
@@ -421,12 +421,12 @@ public final class NettyClient extends HttpClient {
         @Override
         public void cancel() {
             isCanceled = true;
-
             currentEventLoop.execute(() -> {
-                while (!queuedContent.isEmpty()) {
-                    queuedContent.remove().release();
-                }
+                LoggerFactory.getLogger(getClass()).info("Discarding all queue items");
                 handlerSubscription.cancel();
+                while (!queuedContent.isEmpty()) {
+                    queuedContent.remove().touch("Discarding from queue").release();
+                }
             });
         }
 
@@ -443,9 +443,13 @@ public final class NettyClient extends HttpClient {
         }
 
         void onReceivedContent(HttpContent data) {
-            if (subscriber != null && chunksRequested > 0) {
+            if (isCanceled) {
+                data.release();
+            } else if (subscriber != null && chunksRequested > 0) {
+                data.touch("Going out");
                 emitContent(data);
             } else {
+                data.touch("Going into queue");
                 queuedContent.add(data);
             }
         }
@@ -530,6 +534,8 @@ public final class NettyClient extends HttpClient {
                 // channelRead can still come through even after a Subscription.cancel event
                 if (contentEmitter != null) {
                     contentEmitter.onReceivedContent(content);
+                } else {
+                    content.release();
                 }
             }
 
