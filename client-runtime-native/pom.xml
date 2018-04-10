@@ -20,7 +20,7 @@
     <url>https://github.com/Azure/autorest-clientruntime-for-java</url>
 
     <properties>
-        <netty-boringssl.version>2.0.7.Final</netty-boringssl.version>
+        <netty-boringssl.version>2.0.8.Final</netty-boringssl.version>
     </properties>
     <profiles>
         <profile>
