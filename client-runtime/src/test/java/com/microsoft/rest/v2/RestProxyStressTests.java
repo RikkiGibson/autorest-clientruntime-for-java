@@ -48,6 +48,7 @@ import java.io.File;
 import java.io.IOException;
 import java.lang.ProcessBuilder.Redirect;
 import java.nio.ByteBuffer;
+import java.nio.channels.AsynchronousChannel;
 import java.nio.channels.AsynchronousFileChannel;
 import java.nio.channels.FileChannel;
 import java.nio.file.FileVisitResult;
@@ -195,6 +196,9 @@ public class RestProxyStressTests {
 
         @GET("/javasdktest/upload/100m-{id}.dat?{sas}")
         Single<StreamResponse> download100M(@PathParam("id") String id, @PathParam(value = "sas", encoded = true) String sas);
+
+        @GET("/javasdktest/upload/1g-{id}.dat?{sas}")
+        Single<StreamResponse> download1G(@PathParam("id") String id, @PathParam(value = "sas", encoded = true) String sas);
 
         @ExpectedResponses({201})
         @PUT("/testcontainer{id}?restype=container&{sas}")
@@ -454,5 +458,51 @@ public class RestProxyStressTests {
                                 })
                                 .andThen(innerService.deleteContainer(integer.toString(), sas).toCompletable()))
                 .blockingAwait();
+    }
+
+    @Test
+    public void uploadLargeSingleFile() throws Exception {
+        Path singleFilePath = TEMP_FOLDER_PATH.resolve("1g-0.dat");
+        if (Files.exists(singleFilePath)) {
+            LoggerFactory.getLogger(getClass()).info("Test file already exists");
+        } else {
+            LoggerFactory.getLogger(getClass()).info("Generating test file...");
+            MessageDigest messageDigest = MessageDigest.getInstance("MD5");
+            Flowable<ByteBuffer> contentGenerator = Flowable.generate(Random::new, (random, emitter) -> {
+                ByteBuffer buf = ByteBuffer.allocate(CHUNK_SIZE);
+                random.nextBytes(buf.array());
+                messageDigest.update(buf.array());
+                emitter.onNext(buf);
+            });
+            Flowable<ByteBuffer> content = contentGenerator.take(1024*1024*1024/CHUNK_SIZE);
+
+            Completable write = Completable.using(() -> AsynchronousFileChannel.open(singleFilePath, StandardOpenOption.WRITE, StandardOpenOption.CREATE_NEW),
+                    fc -> FlowableUtil.writeFile(content, fc),
+                    AsynchronousFileChannel::close);
+            write.blockingAwait();
+            Files.write(TEMP_FOLDER_PATH.resolve("1g-0-md5.dat"), messageDigest.digest());
+        }
+        // TODO blocklist stuff
+    }
+
+    @Test
+    public void downloadLargeSingleFile() throws Exception {
+        final String sas = System.getenv("JAVA_SDK_TEST_SAS") == null ? "" : System.getenv("JAVA_SDK_TEST_SAS");
+
+        for (int i = 0; i < 20; i++) {
+//            MessageDigest md5 = MessageDigest.getInstance("MD5");
+            Instant startTime = Instant.now();
+            service.download1G("0", sas)
+                    .flatMapCompletable(res ->
+                            Completable.using(() -> AsynchronousFileChannel.open(TEMP_FOLDER_PATH.resolve("1g-0-copy.dat"),
+                                    StandardOpenOption.CREATE, StandardOpenOption.WRITE, StandardOpenOption.TRUNCATE_EXISTING),
+                                    fc -> FlowableUtil.writeFile(res.body()/*.doOnNext(buf -> md5.update(buf.slice()))*/, fc),
+                                    AsynchronousChannel::close))
+                    .blockingAwait();
+            Instant endTime = Instant.now();
+//        byte[] expectedMd5 = Files.readAllBytes(TEMP_FOLDER_PATH.resolve("1g-0-md5.dat"));
+//        assertArrayEquals(expectedMd5, md5.digest());
+            LoggerFactory.getLogger(getClass()).info("Time taken: {}", Duration.between(startTime, endTime));
+        }
     }
 }
