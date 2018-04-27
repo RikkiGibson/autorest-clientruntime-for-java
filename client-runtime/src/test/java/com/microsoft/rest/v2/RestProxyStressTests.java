@@ -95,6 +95,8 @@ public class RestProxyStressTests {
             tempFolderPath = "temp";
         }
 
+        TEMP_FOLDER_PATH = Paths.get(tempFolderPath);
+
         HttpHeaders headers = new HttpHeaders()
                 .set("x-ms-version", "2017-04-17");
         HttpPipelineBuilder builder = new HttpPipelineBuilder()
@@ -111,15 +113,13 @@ public class RestProxyStressTests {
         builder.withHttpLoggingPolicy(HttpLogDetailLevel.BASIC);
 
         service = RestProxy.create(IOService.class, builder.build());
-
-        TEMP_FOLDER_PATH = Paths.get(tempFolderPath);
         create100MFiles(false);
     }
 
     private static void launchTestServer() throws IOException {
         String portString = System.getenv("JAVA_SDK_TEST_PORT");
         // TODO: figure out why test server hangs only when spawned as a subprocess
-        Assume.assumeTrue("JAVA_SDK_TEST_PORT must specify the port of a running local server", portString != null);
+//        Assume.assumeTrue("JAVA_SDK_TEST_PORT must specify the port of a running local server", portString != null);
         if (portString != null) {
             port = Integer.parseInt(portString, 10);
             LoggerFactory.getLogger(RestProxyStressTests.class).warn("Attempting to connect to already-running test server on port {}", port);
@@ -131,6 +131,7 @@ public class RestProxyStressTests {
 
             ProcessBuilder builder = new ProcessBuilder(
                     javaExecutable, "-cp", classpath, className).redirectErrorStream(true).redirectOutput(Redirect.INHERIT);
+            builder.environment().put("JAVA_STRESS_TEST_TEMP_PATH", TEMP_FOLDER_PATH.toString());
             testServer = builder.start();
         }
     }

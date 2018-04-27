@@ -157,6 +157,7 @@ public final class NettyClient extends HttpClient {
                 int poolSize) {
             bootstrap.group(config.eventLoopGroup);
             bootstrap.channel(config.channelClass);
+//            bootstrap.option(ChannelOption.RCVBUF_ALLOCATOR, new AdaptiveRecvByteBufAllocator(128 * 1024, 128 * 1024, 512 * 1024));
             bootstrap.option(ChannelOption.AUTO_READ, false);
             bootstrap.option(ChannelOption.SO_KEEPALIVE, true);
             bootstrap.option(ChannelOption.CONNECT_TIMEOUT_MILLIS, (int) TimeUnit.MINUTES.toMillis(3L));
@@ -165,7 +166,7 @@ public final class NettyClient extends HttpClient {
                 public synchronized void channelCreated(Channel ch) throws Exception {
                     // Why is it necessary to have "synchronized" to prevent NRE in pipeline().get(Class<T>)?
                     // Is channelCreated not run on the eventLoop assigned to the channel?
-                    ch.pipeline().addLast("HttpResponseDecoder", new HttpResponseDecoder());
+                    ch.pipeline().addLast("HttpResponseDecoder", new HttpResponseDecoder()); // new HttpResponseDecoder(4096, 8192, 512 * 1024, true));
                     ch.pipeline().addLast("HttpRequestEncoder", new HttpRequestEncoder());
                     ch.pipeline().addLast("HttpClientInboundHandler", new HttpClientInboundHandler());
                 }
